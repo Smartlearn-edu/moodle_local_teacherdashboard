@@ -1,0 +1,39 @@
+/* Sidebar Styles */
+.teacherdashboard-sidebar {
+    background-color: #1a1d21; /* Dark sleek background */
+    color: #b0b3b8;
+    min-height: 80vh; /* Adjust as needed */
+    padding: 20px 0;
+    border-radius: 12px;
+    margin-right: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.teacherdashboard-sidebar .nav-link {
+    color: #b0b3b8;
+    padding: 12px 24px;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+    font-weight: 500;
+}
+
+.teacherdashboard-sidebar .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255,255,255,0.05);
+}
+
+.teacherdashboard-sidebar .nav-link.active {
+    color: #fff;
+    background-color: rgba(59, 130, 246, 0.15); /* Subtle blue tint */
+    border-left-color: #3b82f6; /* Blue accent */
+}
+
+.teacherdashboard-sidebar .nav-link i {
+    width: 24px;
+    text-align: center;
+    margin-right: 10px;
+}
+
+.dashboard-container {
+    padding-top: 20px;
+}
