@@ -6,29 +6,29 @@
                 <div class="text-center mb-4 pt-2">
                      <h4 class="text-white">Dashboard</h4>
                 </div>
-                <ul class="nav flex-column">
+                <ul class="nav flex-column" id="dashboard-sidebar-nav">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#" aria-current="page">
+                        <a class="nav-link active" href="#" data-target="section-overview">
                             <i class="fa fa-th-large"></i> {{#str}}section_overview, local_teacherdashboard{{/str}}
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-target="section-progress">
                             <i class="fa fa-users"></i> {{#str}}section_progress, local_teacherdashboard{{/str}}
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-target="section-grading">
                             <i class="fa fa-check-square"></i> {{#str}}section_grading, local_teacherdashboard{{/str}}
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-target="section-analytics">
                             <i class="fa fa-bar-chart"></i> {{#str}}section_analytics, local_teacherdashboard{{/str}}
                         </a>
                     </li>
                      <li class="nav-item mt-4">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-target="section-settings">
                             <i class="fa fa-cog"></i> {{#str}}section_settings, local_teacherdashboard{{/str}}
                         </a>
                     </li>
@@ -38,60 +38,108 @@
 
         <!-- Main Content -->
         <div class="col-md-9 col-lg-10">
+            <!-- Header -->
             <div class="row mb-4">
                 <div class="col-12">
                     <h2 class="dashboard-title">{{#str}}pluginname, local_teacherdashboard{{/str}}</h2>
-                    <p class="text-muted">Welcome back! Here are the courses you are teaching.</p>
+                    <p class="text-muted" id="dashboard-subtitle">Welcome back! Here are the courses you are teaching.</p>
                 </div>
             </div>
 
-            <div class="row course-grid">
-                {{#courses}}
-                <div class="col-md-6 col-xl-4 mb-4">
-                    <div class="card h-100 shadow-sm border-0 course-card">
-                        <div class="card-img-top-wrapper" style="height: 160px; overflow: hidden; background-color: #f5f5f5; position: relative;">
-                            {{#imageurl}}
-                            <img src="{{imageurl}}" class="card-img-top h-100 w-100 object-fit-cover" alt="{{fullname}}">
-                            {{/imageurl}}
-                            {{^imageurl}}
-                            <div class="d-flex align-items-center justify-content-center h-100 text-secondary">
-                                <i class="fa fa-graduation-cap fa-3x"></i>
-                            </div>
-                            {{/imageurl}}
-                            
-                            <div class="course-category-badge position-absolute top-0 end-0 m-2 badge bg-primary bg-opacity-75">
-                                {{categoryname}}
+            <!-- Content Sections -->
+            <div id="content-container">
+                
+                <!-- Overview Section -->
+                <div id="section-overview" class="dashboard-section">
+                    <div class="row course-grid">
+                        {{#courses}}
+                        <div class="col-md-6 col-xl-4 mb-4">
+                            <div class="card h-100 shadow-sm border-0 course-card">
+                                <div class="card-img-top-wrapper" style="height: 160px; overflow: hidden; background-color: #f5f5f5; position: relative;">
+                                    {{#imageurl}}
+                                    <img src="{{imageurl}}" class="card-img-top h-100 w-100 object-fit-cover" alt="{{fullname}}">
+                                    {{/imageurl}}
+                                    {{^imageurl}}
+                                    <div class="d-flex align-items-center justify-content-center h-100 text-secondary">
+                                        <i class="fa fa-graduation-cap fa-3x"></i>
+                                    </div>
+                                    {{/imageurl}}
+                                    
+                                    <div class="course-category-badge position-absolute top-0 end-0 m-2 badge bg-primary bg-opacity-75">
+                                        {{categoryname}}
+                                    </div>
+                                </div>
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title text-truncate" title="{{fullname}}">
+                                        <a href="{{viewurl}}" class="text-decoration-none text-dark stretched-link">{{fullname}}</a>
+                                    </h5>
+                                    <div class="mt-auto pt-3 d-flex justify-content-between align-items-center">
+                                        <span class="text-muted small">
+                                            <i class="fa fa-users me-1"></i> {{studentcount}} {{#str}}students, local_teacherdashboard{{/str}}
+                                        </span>
+                                        {{#hasgrading}}
+                                        <span class="badge bg-danger rounded-pill" title="{{gradingcount}} {{#str}}needsgrading, local_teacherdashboard{{/str}}" style="position: relative; z-index: 2;">
+                                            <i class="fa fa-check-square-o me-1"></i> {{gradingcount}}
+                                        </span>
+                                        {{/hasgrading}}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title text-truncate" title="{{fullname}}">
-                                <a href="{{viewurl}}" class="text-decoration-none text-dark stretched-link">{{fullname}}</a>
-                            </h5>
-                            <div class="mt-auto pt-3 d-flex justify-content-between align-items-center">
-                                <span class="text-muted small">
-                                    <i class="fa fa-users me-1"></i> {{studentcount}} {{#str}}students, local_teacherdashboard{{/str}}
-                                </span>
-                                {{#hasgrading}}
-                                <span class="badge bg-danger rounded-pill" title="{{gradingcount}} {{#str}}needsgrading, local_teacherdashboard{{/str}}" style="position: relative; z-index: 2;">
-                                    <i class="fa fa-check-square-o me-1"></i> {{gradingcount}}
-                                </span>
-                                {{/hasgrading}}
+                        {{/courses}}
+                        {{^courses}}
+                        <div class="col-12">
+                            <div class="alert alert-info" role="alert">
+                                {{#str}}nocourses, local_teacherdashboard{{/str}}
                             </div>
                         </div>
+                        {{/courses}}
                     </div>
                 </div>
-                {{/courses}}
-                {{^courses}}
-                <div class="col-12">
-                    <div class="alert alert-info" role="alert">
-                        {{#str}}nocourses, local_teacherdashboard{{/str}}
+
+                <!-- Progress Section (Placeholder) -->
+                <div id="section-progress" class="dashboard-section d-none">
+                    <div class="alert alert-light border">
+                        <h4><i class="fa fa-users text-info"></i> {{#str}}section_progress, local_teacherdashboard{{/str}}</h4>
+                        <p>Student progress analytics will appear here.</p>
+                        <!-- We will implement this next -->
                     </div>
                 </div>
-                {{/courses}}
+
+                <!-- Grading Section (Placeholder) -->
+                <div id="section-grading" class="dashboard-section d-none">
+                    <div class="alert alert-light border">
+                        <h4><i class="fa fa-check-square text-success"></i> {{#str}}section_grading, local_teacherdashboard{{/str}}</h4>
+                        <p>Consolidated grading view will appear here.</p>
+                    </div>
+                </div>
+
+                <!-- Analytics Section (Placeholder) -->
+                <div id="section-analytics" class="dashboard-section d-none">
+                    <div class="alert alert-light border">
+                        <h4><i class="fa fa-bar-chart text-warning"></i> {{#str}}section_analytics, local_teacherdashboard{{/str}}</h4>
+                        <p>Course analytics will appear here.</p>
+                    </div>
+                </div>
+                 
+                 <!-- Settings Section (Placeholder) -->
+                <div id="section-settings" class="dashboard-section d-none">
+                     <div class="alert alert-light border">
+                        <h4><i class="fa fa-cog text-secondary"></i> {{#str}}section_settings, local_teacherdashboard{{/str}}</h4>
+                        <p>Dashboard settings will appear here.</p>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 </div>
+
+{{#js}}
+require(['local_teacherdashboard/main'], function(Main) {
+    Main.init();
+});
+{{/js}}
 
 <style>
 .dashboard-title {

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Progress Tracker - Multi-Course</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script>
+        const App = {
+            courses: [],
+            progress: [],
+            stats: {},
+            
+            init() {
+                this.render();
+            },
+
+            addCourse() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.csv';
+                input.onchange = (e) => this.handleFileUpload(e);
+                input.click();
+            },
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const courseName = file.name.replace('.csv', '');
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    Papa.parse(text, {
+                        header: true,
+                        skipEmptyLines: true,
+                        dynamicTyping: false,
+                        complete: (results) => {
+                            const courseData = {
+                                name: courseName,
+                                students: results.data.map(row => ({
+                                    name: (row.Name || row.name || '').trim(),
+                                    email: (row['Email address'] || row['Email Address'] || row.email || '').trim().toLowerCase(),
+                                    completed: !!(row['Course complete'] || row['Course Complete'] || row.completed || '').trim()
+                                })),
+                                totalEnrolled: results.data.length
+                            };
+                            
+                            this.courses.push(courseData);
+                            this.calculateProgress();
+                            this.render();
+                        }
+                    });
+                };
+                reader.readAsText(file);
+            },
+
+            removeCourse(index) {
+                this.courses.splice(index, 1);
+                this.calculateProgress();
+                this.render();
+            },
+
+            calculateProgress() {
+                if (this.courses.length === 0) {
+                    this.progress = [];
+                    this.stats = {};
+                    return;
+                }
+
+                const studentMap = new Map();
+
+                this.courses.forEach((course, courseIndex) => {
+                    course.students.forEach(student => {
+                        if (student.email) {
+                            if (!studentMap.has(student.email)) {
+                                studentMap.set(student.email, {
+                                    name: student.name,
+                                    email: student.email,
+                                    courses: new Array(this.courses.length).fill(false)
+                                });
+                            }
+                            studentMap.get(student.email).courses[courseIndex] = student.completed;
+                        }
+                    });
+                });
+
+                this.progress = Array.from(studentMap.values());
+
+                const totalStudents = this.progress.length;
+                const courseStats = this.courses.map((course, index) => ({
+                    name: course.name,
+                    completed: this.progress.filter(s => s.courses[index]).length,
+                    total: course.totalEnrolled
+                }));
+
+                const allCompleted = this.progress.filter(s => 
+                    s.courses.every(completed => completed)
+                ).length;
+
+                this.stats = {
+                    totalStudents,
+                    courseStats,
+                    allCompleted
+                };
+            },
+
+            exportToCSV() {
+                const headers = ['Name', 'Email', ...this.courses.map(c => c.name), 'Total Completed'];
+                
+                const csvData = this.progress.map(student => {
+                    const completedCount = student.courses.filter(Boolean).length;
+                    return {
+                        'Name': student.name,
+                        'Email': student.email,
+                        ...Object.fromEntries(
+                            this.courses.map((course, index) => [
+                                course.name,
+                                student.courses[index] ? 'Completed' : 'Not Completed'
+                            ])
+                        ),
+                        'Total Completed': `${completedCount}/${this.courses.length}`
+                    };
+                });
+
+                const csv = Papa.unparse(csvData);
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'student_progress_report.csv');
+                link.click();
+            },
+
+            render() {
+                const app = document.getElementById('app');
+                
+                if (this.courses.length === 0) {
+                    app.innerHTML = `
+                        <div class="min-h-screen flex items-center justify-center p-6">
+                            <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full">
+                                <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Student Progress Tracker</h1>
+                                <p class="text-gray-600 mb-6 text-center">Upload your course CSV files to analyze student progress</p>
+                                
+                                <div class="text-center mb-6">
+                                    <div class="inline-block p-8 bg-blue-50 rounded-lg border-2 border-dashed border-blue-300">
+                                        <svg class="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                        </svg>
+                                        <p class="text-gray-600 mb-4">No courses uploaded yet</p>
+                                        <button onclick="App.addCourse()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                                            Upload First Course
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+                                    <p class="font-semibold mb-2">📋 CSV File Requirements:</p>
+                                    <ul class="list-disc list-inside space-y-1 ml-2">
+                                        <li>Column: <strong>Name</strong> (student name)</li>
+                                        <li>Column: <strong>Email address</strong> (student email)</li>
+                                        <li>Column: <strong>Course complete</strong> (date if completed, empty if not)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const allCompletedPercentage = this.stats.totalStudents > 0 
+                        ? ((this.stats.allCompleted / this.stats.totalStudents) * 100).toFixed(1)
+                        : '0.0';
+                    
+                    const colorPalette = [
+                        'from-blue-500 to-blue-600',
+                        'from-green-500 to-green-600',
+                        'from-purple-500 to-purple-600',
+                        'from-orange-500 to-orange-600',
+                        'from-pink-500 to-pink-600',
+                        'from-indigo-500 to-indigo-600',
+                        'from-red-500 to-red-600',
+                        'from-yellow-500 to-yellow-600',
+                        'from-teal-500 to-teal-600',
+                        'from-cyan-500 to-cyan-600',
+                        'from-lime-500 to-lime-600',
+                        'from-amber-500 to-amber-600',
+                        'from-rose-500 to-rose-600',
+                        'from-violet-500 to-violet-600'
+                    ];
+                    
+                    app.innerHTML = `
+                        <div class="min-h-screen p-6">
+                            <div class="max-w-7xl mx-auto">
+                                <div class="bg-white rounded-lg shadow-lg p-6 mb-6 fade-in">
+                                    <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                                        <div>
+                                            <h1 class="text-3xl font-bold text-gray-800">Student Progress Tracker</h1>
+                                            <p class="text-gray-600 mt-1">${this.courses.length} course${this.courses.length !== 1 ? 's' : ''} • ${this.stats.totalStudents} students</p>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button onclick="App.addCourse()" class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                                </svg>
+                                                Add Course
+                                            </button>
+                                            <button onclick="App.exportToCSV()" class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                </svg>
+                                                Export CSV
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Uploaded Courses -->
+                                    <div class="mb-6">
+                                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Uploaded Courses:</h3>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${this.courses.map((course, index) => `
+                                                <div class="bg-gray-100 rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
+                                                    <span class="font-medium text-gray-700">${course.name}</span>
+                                                    <button onclick="App.removeCourse(${index})" class="text-red-500 hover:text-red-700">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+
+                                    <!-- Statistics Cards -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gradient-to-br from-slate-500 to-slate-600 rounded-lg p-4 text-white">
+                                            <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                            </svg>
+                                            <div class="text-2xl font-bold">${this.stats.totalStudents}</div>
+                                            <div class="text-sm opacity-90">Total Students</div>
+                                        </div>
+                                        ${this.stats.courseStats.map((stat, index) => `
+                                            <div class="bg-gradient-to-br ${colorPalette[index % colorPalette.length]} rounded-lg p-4 text-white">
+                                                <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                <div class="text-2xl font-bold">${stat.completed}</div>
+                                                <div class="text-sm opacity-90">${stat.name}</div>
+                                                <div class="text-xs opacity-75">of ${stat.total} enrolled</div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            <span class="font-semibold text-blue-900">Complete Program</span>
+                                        </div>
+                                        <div class="text-2xl font-bold text-blue-600">${this.stats.allCompleted}</div>
+                                        <div class="text-sm text-blue-700">students completed all ${this.courses.length} courses (${allCompletedPercentage}%)</div>
+                                    </div>
+                                </div>
+
+                                <!-- Student Progress Table -->
+                                <div class="bg-white rounded-lg shadow-lg overflow-hidden fade-in">
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full">
+                                            <thead class="bg-gray-100 border-b">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase sticky left-0 bg-gray-100 z-10">Student Name</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Email</th>
+                                                    ${this.courses.map(course => `
+                                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">${course.name}</th>
+                                                    `).join('')}
+                                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase">Progress</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-200">
+                                                ${this.progress.map(student => {
+                                                    const completedCount = student.courses.filter(Boolean).length;
+                                                    const progressWidth = (completedCount / this.courses.length) * 100;
+                                                    const progressColor = completedCount === this.courses.length ? 'bg-green-500' :
+                                                                         completedCount >= this.courses.length * 0.7 ? 'bg-blue-500' :
+                                                                         completedCount >= this.courses.length * 0.4 ? 'bg-yellow-500' : 'bg-red-400';
+                                                    
+                                                    return `
+                                                        <tr class="hover:bg-gray-50">
+                                                            <td class="px-6 py-4 text-sm font-medium text-gray-900 sticky left-0 bg-white">${student.name}</td>
+                                                            <td class="px-6 py-4 text-sm text-gray-600">${student.email}</td>
+                                                            ${student.courses.map(completed => `
+                                                                <td class="px-4 py-4 text-center">
+                                                                    ${completed ? 
+                                                                        '<svg class="w-5 h-5 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' : 
+                                                                        '<svg class="w-5 h-5 text-gray-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+                                                                    }
+                                                                </td>
+                                                            `).join('')}
+                                                            <td class="px-6 py-4">
+                                                                <div class="flex items-center justify-center gap-2">
+                                                                    <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                                        <div class="${progressColor} h-2 rounded-full transition-all" style="width: ${progressWidth}%"></div>
+                                                                    </div>
+                                                                    <span class="text-sm font-medium text-gray-700 whitespace-nowrap">${completedCount}/${this.courses.length}</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    `;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        App.init();
+    </script>
+</body>
+</html>
