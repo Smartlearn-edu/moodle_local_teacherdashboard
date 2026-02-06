@@ -51,9 +51,20 @@ class dashboard implements renderable, templatable
 
             // Get course image
             $imageurl = '';
-            $coursefiles = course_summary_exporter::get_course_overview_files($course, $coursecontext);
-            if ($coursefiles) {
-                foreach ($coursefiles as $file) {
+
+            // robust way to get course image: check the file area directly
+            $fs = \get_file_storage();
+            $files = $fs->get_area_files(
+                $coursecontext->id,
+                'course',
+                'overviewfiles',
+                0,
+                'sortorder, itemid, filepath, filename',
+                false // exclude directories
+            );
+
+            if ($files) {
+                foreach ($files as $file) {
                     if ($file->is_valid_image()) {
                         $imageurl = moodle_url::make_pluginfile_url(
                             $file->get_contextid(),
