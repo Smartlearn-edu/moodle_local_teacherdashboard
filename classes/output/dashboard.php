@@ -83,13 +83,45 @@ class dashboard implements renderable, templatable
             // Count students
             $studentcount = \count_enrolled_users($coursecontext);
 
+            // Count submissions needing grading
+            // We look for submissions that are submitted, latest, and do not have a grade (or grade < 0).
+            $sql = "SELECT COUNT(s.id)
+                      FROM {assign_submission} s
+                      JOIN {assign} a ON a.id = s.assignment
+                     WHERE a.course = :courseid
+                       AND s.status = :status
+                       AND s.latest = 1
+                       AND NOT EXISTS (
+                           SELECT 1 
+                             FROM {assign_grades} g 
+                            WHERE g.assignment = a.id 
+                              AND g.userid = s.userid 
+                              AND g.attemptnumber = s.attemptnumber 
+                              AND g.grade >= 0
+                       )";
+
+            $gradingcount = 0;
+            try {
+                global $DB; // Ensure $DB is available
+                $gradingcount = $DB->count_records_sql($sql, [
+                    'courseid' => $course->id,
+                    'status' => 'submitted'
+                ]);
+            } catch (\Exception $e) {
+                // If tables don't exist (e.g. mod_assign disabled), ignore.
+            }
+
+            $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
+
             $data->courses[] = [
                 'id' => $course->id,
                 'fullname' => $course->fullname,
-                'viewurl' => new moodle_url('/course/view.php', ['id' => $course->id])->out(false),
+                'viewurl' => $courseurl->out(false),
                 'imageurl' => $imageurl,
                 'categoryname' => $categoryname,
-                'studentcount' => $studentcount
+                'studentcount' => $studentcount,
+                'gradingcount' => $gradingcount,
+                'hasgrading' => ($gradingcount > 0)
             ];
         }
 
