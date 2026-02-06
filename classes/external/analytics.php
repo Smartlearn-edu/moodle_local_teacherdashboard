@@ -20,64 +20,130 @@ class analytics extends external_api
      * Returns description of method parameters
      * @return external_function_parameters
      */
-    public static function get_student_progress_parameters()
+    public static function get_cross_course_progress_parameters()
     {
-        return new external_function_parameters([
-            // No parameters needed for now, getting all teacher courses
-        ]);
+        return new external_function_parameters([]);
     }
 
     /**
-     * Get student progress data for the teacher
+     * Get cross-course progress data
      * @return array
      */
-    public static function get_student_progress()
+    public static function get_cross_course_progress()
     {
-        global $DB, $USER;
+        global $DB, $USER, $CFG;
 
-        $params = self::validate_parameters(self::get_student_progress_parameters(), []);
-        $context = context_system::instance();
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $params = self::validate_parameters(self::get_cross_course_progress_parameters(), []);
+        $context = \context_system::instance();
         self::validate_context($context);
 
-        // Get teacher's courses
-        // This is a simplified fetch - reusing the logic from dashboard.php roughly
-        $courses = \enrol_get_users_courses($USER->id, true, 'id, fullname');
+        // 1. Get teacher's courses
+        $courses = \enrol_get_users_courses($USER->id, true, 'id, fullname, shortname');
+        $mycourses = [];
+        $courseids = [];
 
-        $data = [];
         foreach ($courses as $course) {
             $coursecontext = \context_course::instance($course->id);
-            if (!\has_capability('moodle/course:update', $coursecontext)) {
-                continue;
+            if (\has_capability('moodle/course:update', $coursecontext)) {
+                $mycourses[] = [
+                    'id' => $course->id,
+                    'name' => $course->fullname
+                ];
+                $courseids[] = $course->id;
             }
-
-            // Mock Data for now - to be replaced with real queries
-            // In a real scenario, we'd query completion_agg table or assignments
-            $data[] = [
-                'courseid' => $course->id,
-                'coursename' => $course->fullname,
-                'completion_rate' => rand(40, 95),
-                'active_students' => rand(5, 50),
-                'total_students' => 50
-            ];
         }
 
-        return $data;
+        if (empty($courseids)) {
+            return ['courses' => [], 'students' => []];
+        }
+
+        // 2. Get students and their completion status across these courses
+        // We fetch users who are enrolled in ANY of verify course ids.
+        // We use a simplified query to get user details + course completion record.
+
+        list($insql, $inparams) = $DB->get_in_or_equal($courseids, \SQL_PARAMS_NAMED);
+
+        // Fetch unique students enrolled in these courses
+        // Note: keeping it simple - checking enrollment via standard API is safer but this is a dashboard analytics query
+        // so we define "Student" as someone with a completion record or valid enrollment.
+        // Let's rely on course_completions table which exists for enrolled users if completion is enabled.
+
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+                  FROM {user} u
+                  JOIN {user_enrolments} ue ON ue.userid = u.id
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                 WHERE e.courseid $insql
+                   AND u.deleted = 0";
+
+        $students = $DB->get_records_sql($sql, $inparams);
+
+        // Fetch completion states
+        $completesql = "SELECT userid, course, timecompleted
+                          FROM {course_completions}
+                         WHERE course $insql
+                           AND timecompleted > 0";
+        $completions = $DB->get_records_sql($completesql, $inparams);
+
+        // Build the matrix
+        $studentData = [];
+        $completionMap = [];
+        foreach ($completions as $c) {
+            $completionMap[$c->userid][$c->course] = true;
+        }
+
+        foreach ($students as $student) {
+            $studentContext = [
+                'id' => $student->id,
+                'name' => \fullname($student),
+                'email' => $student->email,
+                'completions' => []
+            ];
+
+            foreach ($courseids as $cid) {
+                // Check if completed
+                $isCompleted = isset($completionMap[$student->id][$cid]);
+                $studentContext['completions'][] = [
+                    'courseid' => $cid,
+                    'completed' => $isCompleted
+                ];
+            }
+            $studentData[] = $studentContext;
+        }
+
+        return [
+            'courses' => $mycourses,
+            'students' => $studentData
+        ];
     }
 
     /**
      * Returns description of method result value
-     * @return external_multiple_structure
+     * @return \external_single_structure
      */
-    public static function get_student_progress_returns()
+    public static function get_cross_course_progress_returns()
     {
-        return new external_multiple_structure(
-            new external_single_structure([
-                'courseid' => new external_value(PARAM_INT, 'Course ID'),
-                'coursename' => new external_value(PARAM_TEXT, 'Course Name'),
-                'completion_rate' => new external_value(PARAM_INT, 'Average Completion Rate (%)'),
-                'active_students' => new external_value(PARAM_INT, 'Active Students last 7 days'),
-                'total_students' => new external_value(PARAM_INT, 'Total Students')
-            ])
-        );
+        return new \external_single_structure([
+            'courses' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'id' => new \external_value(PARAM_INT, 'Course ID'),
+                    'name' => new \external_value(PARAM_TEXT, 'Course Name')
+                ])
+            ),
+            'students' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'id' => new \external_value(PARAM_INT, 'Student ID'),
+                    'name' => new \external_value(PARAM_TEXT, 'Student Name'),
+                    'email' => new \external_value(PARAM_TEXT, 'Student Email'),
+                    'completions' => new \external_multiple_structure(
+                        new \external_single_structure([
+                            'courseid' => new \external_value(PARAM_INT, 'Course ID'),
+                            'completed' => new \external_value(PARAM_BOOL, 'Is completed?')
+                        ])
+                    )
+                ])
+            )
+        ]);
     }
 }
