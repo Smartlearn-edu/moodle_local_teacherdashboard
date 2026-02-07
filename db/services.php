@@ -16,4 +16,11 @@ $functions = [
         'type'        => 'read',
         'ajax'        => true,
     ],
+    'local_teacherdashboard_get_grading_overview' => [
+        'classname'   => 'local_teacherdashboard\external\grading',
+        'methodname'  => 'get_grading_overview',
+        'description' => 'Get overview of assignments needing grading',
+        'type'        => 'read',
+        'ajax'        => true,
+    ],
 ];
