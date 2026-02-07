@@ -26,66 +26,142 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
             });
         },
 
+        /**
+         * Render filter controls
+         */
+        renderFilters: function () {
+            var self = this;
+            var courses = this.allData.courses || [];
+            // Extract unique categories
+            var categories = {};
+            courses.forEach(function (c) {
+                if (c.category && c.categoryname) {
+                    categories[c.category] = c.categoryname;
+                }
+            });
+
+            var html = '<div class="row mb-4 animate__animated animate__fadeIn">';
+
+            // Course Filter
+            html += '<div class="col-md-6 col-lg-4 mb-2">';
+            html += '<select id="filter-course" class="form-select border-0 shadow-sm">';
+            html += '<option value="">All Courses</option>';
+            courses.forEach(function (c) {
+                html += '<option value="' + c.id + '">' + c.name + '</option>';
+            });
+            html += '</select></div>';
+
+            // Category Filter
+            html += '<div class="col-md-6 col-lg-4 mb-2">';
+            html += '<select id="filter-category" class="form-select border-0 shadow-sm">';
+            html += '<option value="">All Categories</option>';
+            for (var catId in categories) {
+                html += '<option value="' + catId + '">' + categories[catId] + '</option>';
+            }
+            html += '</select></div>';
+
+            html += '</div>';
+
+            // Clear existing filters if re-rendering filters (e.g., if data changes, though not expected here)
+            this.container.find('.row.mb-4.animate__animated.animate__fadeIn').remove();
+            this.container.prepend(html);
+
+            // Add event listeners
+            this.container.find('#filter-course, #filter-category').on('change', function () {
+                self.applyFilters();
+            });
+        },
+
+        /**
+         * Apply filters and re-render the content area
+         */
+        applyFilters: function () {
+            var courseId = this.container.find('#filter-course').val();
+            var catId = this.container.find('#filter-category').val();
+
+            var filteredCourses = this.allData.courses.filter(function (c) {
+                var matchCourse = courseId === "" || c.id == courseId;
+                var matchCat = catId === "" || c.category == catId;
+                return matchCourse && matchCat;
+            });
+
+            // Pass filtered courses but keep all students (we render based on visible courses)
+            var filteredData = {
+                courses: filteredCourses,
+                students: this.allData.students
+            };
+
+            this.render(filteredData);
+        },
+
         render: function (data) {
             try {
+                // If no students, display message and return
                 if (!data || !data.students || data.students.length === 0) {
-                    this.container.html('<div class="alert alert-info">No progress data available.</div>');
+                    // Ensure content wrapper exists before trying to update it
+                    if (this.container.find('#dashboard-content-wrapper').length === 0) {
+                        this.container.append('<div id="dashboard-content-wrapper"></div>');
+                    }
+                    this.container.find('#dashboard-content-wrapper').html('<div class="alert alert-info">No progress data available.</div>');
                     return;
                 }
 
-                var html = '<div class="row mb-4 animate__animated animate__fadeIn">';
+                var html = '<div id="dashboard-content" class="animate__animated animate__fadeIn">';
                 var self = this;
 
-                // Calculate stats
+                // Helper to find completion for a specific course ID
+                var getCompletion = function (student, courseId) {
+                    if (!student.completions) return null;
+                    return student.completions.find(function (c) { return c.courseid == courseId; });
+                };
+
+                // Calculate stats based on visible courses
                 var totalStudents = data.students.length;
-                var courseCount = data.courses.length;
+                var visibleCourses = data.courses; // These are the courses after filtering
                 var allCompletedCount = 0;
 
-                // Calculate completion counts per course
-                var courseStats = new Array(courseCount).fill(null).map(function () {
-                    return { completed: 0, enrolled: 0 };
-                });
+                // Calculate completion counts per visible course
+                var courseStats = {}; // Map courseId -> stats
+                visibleCourses.forEach(function (c) { courseStats[c.id] = { completed: 0, enrolled: 0 }; });
 
                 data.students.forEach(function (student) {
                     var studentEnrolledCount = 0;
                     var studentCompletedCount = 0;
 
-                    if (student.completions) {
-                        student.completions.forEach(function (comp, index) {
-                            if (comp.enrolled) {
-                                studentEnrolledCount++;
-                                courseStats[index].enrolled++;
-                                if (comp.completed) {
-                                    courseStats[index].completed++;
-                                    studentCompletedCount++;
-                                }
-                            }
-                        });
-                    }
+                    visibleCourses.forEach(function (course) {
+                        var comp = getCompletion(student, course.id);
+                        if (comp && comp.enrolled) {
+                            studentEnrolledCount++;
+                            if (courseStats[course.id]) courseStats[course.id].enrolled++;
 
-                    // Consider "Program Complete" if they completed all courses they are enrolled in (and enrolled in at least one)
+                            if (comp.completed) {
+                                if (courseStats[course.id]) courseStats[course.id].completed++;
+                                studentCompletedCount++;
+                            }
+                        }
+                    });
+
+                    // Consider "Program Complete" if they completed all *visible* courses they are enrolled in
                     if (studentEnrolledCount > 0 && studentEnrolledCount === studentCompletedCount) {
                         allCompletedCount++;
                     }
                 });
 
                 // 1. Stats Cards
+                html += '<div class="row mb-4">';
                 html += this.renderStatCard('Total Students', totalStudents, 'users', 'bg-dark text-white');
 
-                if (data.courses) {
-                    data.courses.forEach(function (course, index) {
-                        var stats = courseStats[index];
-                        html += self.renderStatCard(
-                            course.name,
-                            stats.completed + ' / ' + stats.enrolled + ' completed',
-                            'check-circle',
-                            'bg-primary text-white'
-                        );
-                    });
-                }
+                visibleCourses.forEach(function (course) {
+                    var stats = courseStats[course.id];
+                    html += self.renderStatCard(
+                        course.name,
+                        stats.completed + ' / ' + stats.enrolled + ' completed',
+                        'check-circle',
+                        'bg-primary text-white'
+                    );
+                });
 
                 html += this.renderStatCard('Program Complete', allCompletedCount + ' (' + (totalStudents > 0 ? ((allCompletedCount / totalStudents) * 100).toFixed(1) : '0.0') + '%)', 'trophy', 'bg-success text-white');
-
                 html += '</div>'; // End stats row
 
                 // 2. Main Table
@@ -97,13 +173,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 // Header
                 html += '<thead class="bg-light"><tr>';
                 html += '<th class="border-0 px-4 py-3">Student Name</th>';
-                if (data.courses) {
-                    data.courses.forEach(function (course) {
-                        html += '<th class="text-center border-0 px-4 py-3" title="' + course.name + '">' +
-                            (course.name ? course.name.substring(0, 20) + (course.name.length > 20 ? '...' : '') : 'Course') +
-                            '</th>';
-                    });
-                }
+                visibleCourses.forEach(function (course) {
+                    html += '<th class="text-center border-0 px-4 py-3" title="' + course.name + '">' +
+                        (course.name ? course.name.substring(0, 20) + (course.name.length > 20 ? '...' : '') : 'Course') +
+                        '</th>';
+                });
                 html += '<th class="text-center border-0 px-4 py-3">Progress</th>';
                 html += '</tr></thead>';
 
@@ -118,10 +192,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                     rowHtml += '<div class="small text-muted">' + (student.email || '') + '</div>';
                     rowHtml += '</td>';
 
-                    if (student.completions) {
-                        student.completions.forEach(function (comp) {
+                    visibleCourses.forEach(function (course) {
+                        var comp = getCompletion(student, course.id);
+                        if (comp) {
                             if (!comp.enrolled) {
-                                // Not Enrolled - Hollow/Light Grey (swapped from solid)
+                                // Not Enrolled
                                 rowHtml += '<td class="text-center"><i class="fa fa-circle-thin text-muted opacity-25" title="Not Enrolled"></i></td>';
                             } else {
                                 enrolledCount++;
@@ -129,15 +204,17 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                                     completedCount++;
                                     rowHtml += '<td class="text-center"><i class="fa fa-check-circle text-success fa-lg" title="Completed"></i></td>';
                                 } else {
-                                    // Enrolled but Not Completed - Solid Grey (swapped from hollow)
+                                    // Enrolled, Pending
                                     rowHtml += '<td class="text-center"><i class="fa fa-circle text-muted opacity-50" title="Enrolled, Not Completed"></i></td>';
                                 }
                             }
-                        });
-                    }
+                        } else {
+                            // Should not happen if data integrity is good, but fallback for courses not in student's completions
+                            rowHtml += '<td class="text-center"><i class="fa fa-minus text-muted opacity-25" title="No data for this course"></i></td>';
+                        }
+                    });
 
                     // Progress Bar
-                    // Calculate percentage based on Enrolled courses only
                     var percentage = enrolledCount > 0 ? (completedCount / enrolledCount) * 100 : 0;
                     var colorClass = percentage === 100 ? 'bg-success' : (percentage > 50 ? 'bg-info' : 'bg-warning');
 
@@ -154,10 +231,20 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 });
                 html += '</tbody></table></div></div></div>';
 
-                this.container.html(html);
+                html += '</div>'; // End dashboard content
+
+                // Create a content wrapper if it doesn't exist, then update its HTML
+                if (this.container.find('#dashboard-content-wrapper').length === 0) {
+                    this.container.append('<div id="dashboard-content-wrapper"></div>');
+                }
+                this.container.find('#dashboard-content-wrapper').html(html);
             } catch (e) {
                 console.error('Render error:', e);
-                this.container.html('<div class="alert alert-danger">Error rendering student progress: ' + e.message + '</div>');
+                // If an error occurs during rendering, clear the content wrapper and show error
+                if (this.container.find('#dashboard-content-wrapper').length === 0) {
+                    this.container.append('<div id="dashboard-content-wrapper"></div>');
+                }
+                this.container.find('#dashboard-content-wrapper').html('<div class="alert alert-danger">Error rendering student progress: ' + e.message + '</div>');
             }
         },
 

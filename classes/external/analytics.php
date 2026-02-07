@@ -40,23 +40,36 @@ class analytics extends external_api
         self::validate_context($context);
 
         // 1. Get teacher's courses
-        $courses = \enrol_get_users_courses($USER->id, true, 'id, fullname, shortname');
+        $courses = \enrol_get_users_courses($USER->id, true, 'id, fullname, shortname, category');
         $mycourses = [];
         $courseids = [];
+        $categoryids = [];
 
         foreach ($courses as $course) {
             $coursecontext = \context_course::instance($course->id);
             if (\has_capability('moodle/course:update', $coursecontext)) {
                 $mycourses[] = [
                     'id' => $course->id,
-                    'name' => $course->fullname
+                    'name' => $course->fullname,
+                    'category' => $course->category
                 ];
                 $courseids[] = $course->id;
+                $categoryids[$course->category] = $course->category;
             }
         }
 
         if (empty($courseids)) {
             return ['courses' => [], 'students' => []];
+        }
+
+        // Fetch category names
+        list($catsql, $catparams) = $DB->get_in_or_equal($categoryids);
+        $categories = $DB->get_records_select('course_categories', "id $catsql", $catparams, '', 'id, name');
+
+        // Enrich courses with category names
+        foreach ($mycourses as &$course) {
+            $catid = $course['category'];
+            $course['categoryname'] = isset($categories[$catid]) ? $categories[$catid]->name : 'Unknown';
         }
 
         // 2. Get students and their completion status across these courses
@@ -152,7 +165,9 @@ class analytics extends external_api
             'courses' => new \external_multiple_structure(
                 new \external_single_structure([
                     'id' => new \external_value(\PARAM_INT, 'Course ID'),
-                    'name' => new \external_value(\PARAM_TEXT, 'Course Name')
+                    'name' => new \external_value(\PARAM_TEXT, 'Course Name'),
+                    'category' => new \external_value(\PARAM_INT, 'Category ID'),
+                    'categoryname' => new \external_value(\PARAM_TEXT, 'Category Name')
                 ])
             ),
             'students' => new \external_multiple_structure(
