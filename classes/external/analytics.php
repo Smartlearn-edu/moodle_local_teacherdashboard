@@ -176,7 +176,8 @@ class analytics extends external_api
                     'id' => new \external_value(\PARAM_INT, 'Course ID'),
                     'name' => new \external_value(\PARAM_TEXT, 'Course Name'),
                     'category' => new \external_value(\PARAM_INT, 'Category ID'),
-                    'categoryname' => new \external_value(\PARAM_TEXT, 'Category Name')
+                    'categoryname' => new \external_value(\PARAM_TEXT, 'Category Name'),
+                    'categorypath' => new \external_value(\PARAM_TEXT, 'Category Path')
                 ])
             ),
             'students' => new \external_multiple_structure(
