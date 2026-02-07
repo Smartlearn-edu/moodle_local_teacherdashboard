@@ -18,7 +18,17 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 args: {}
             }])[0].done(function (response) {
                 console.log('Analytics data received:', response);
-                self.render(response);
+                // Remove spinner explicitly
+                self.container.find('.fa-spinner').parent().remove();
+
+                self.allData = response;
+                try {
+                    self.renderFilters();
+                    self.render(response);
+                } catch (e) {
+                    console.error('Render crash:', e);
+                    self.container.html('<div class="alert alert-danger">Render Error: ' + e.message + '</div>');
+                }
             }).fail(function (ex) {
                 console.error('Analytics fetch failed:', ex);
                 self.container.html('<div class="alert alert-danger">Error loading data: ' + ex.message + '</div>');
@@ -58,18 +68,92 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
             for (var catId in categories) {
                 html += '<option value="' + catId + '">' + categories[catId] + '</option>';
             }
-            html += '</select></div>';
+            html += '</select>';
 
+            // Sub-category options container
+            html += '<div id="subcategory-options" class="mt-2 text-muted small" style="display:none;">';
+            html += '<div class="form-check form-switch">';
+            html += '<input class="form-check-input" type="checkbox" id="include-subcats">';
+            html += '<label class="form-check-label" for="include-subcats">Include sub-categories</label>';
             html += '</div>';
+            html += '<div id="subcategory-list" class="mt-2 ms-3 border-start ps-2" style="display:none;">';
+            html += '<!-- Subcategories will be populated here -->';
+            html += '</div>';
+            html += '</div>'; // End subcategory options
 
-            // Clear existing filters if re-rendering filters (e.g., if data changes, though not expected here)
+            html += '</div>'; // End col
+
+            html += '</div>'; // End row
+
+            // Clear existing filters if re-rendering filters
             this.container.find('.row.mb-4.animate__animated.animate__fadeIn').remove();
             this.container.prepend(html);
 
             // Add event listeners
-            this.container.find('#filter-course, #filter-category').on('change', function () {
+            this.container.find('#filter-course').on('change', function () {
                 self.applyFilters();
             });
+
+            this.container.find('#filter-category').on('change', function () {
+                self.updateSubCategories();
+                self.applyFilters();
+            });
+
+            this.container.find('#include-subcats').on('change', function () {
+                self.container.find('#subcategory-list').toggle(this.checked);
+                self.applyFilters();
+            });
+
+            // Event delegation for dynamic subcategory checkboxes
+            this.container.on('change', '.subcat-custom-checkbox', function () {
+                self.applyFilters();
+            });
+        },
+
+        updateSubCategories: function () {
+            var selectedCatId = this.container.find('#filter-category').val();
+            var $subOpts = this.container.find('#subcategory-options');
+            var $subList = this.container.find('#subcategory-list');
+
+            if (!selectedCatId) {
+                $subOpts.hide();
+                $subList.empty();
+                return;
+            }
+
+            // Find potential subcategories in the dataset
+            var subCats = {}; // id -> name
+            var hasSubCats = false;
+
+            this.allData.courses.forEach(function (c) {
+                // Check if course belongs to a subcategory of selectedCatId
+                // Path format is /parent/child/grandchild
+                // So search for '/selectedCatId/'
+                if (c.categorypath && c.category != selectedCatId && c.categorypath.indexOf('/' + selectedCatId + '/') !== -1) {
+                    subCats[c.category] = c.categoryname;
+                    hasSubCats = true;
+                }
+            });
+
+            if (hasSubCats) {
+                $subOpts.show();
+                var listHtml = '<h6 class="mb-1">Select Sub-categories:</h6>';
+                for (var id in subCats) {
+                    listHtml += '<div class="form-check">';
+                    listHtml += '<input class="form-check-input subcat-custom-checkbox" type="checkbox" value="' + id + '" id="subcat-' + id + '" checked>';
+                    listHtml += '<label class="form-check-label" for="subcat-' + id + '">' + subCats[id] + '</label>';
+                    listHtml += '</div>';
+                }
+                $subList.html(listHtml);
+
+                // Ensure visibility matches checkbox state
+                var isChecked = this.container.find('#include-subcats').is(':checked');
+                $subList.toggle(isChecked);
+
+            } else {
+                $subOpts.hide();
+                $subList.empty();
+            }
         },
 
         /**
@@ -78,10 +162,32 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
         applyFilters: function () {
             var courseId = this.container.find('#filter-course').val();
             var catId = this.container.find('#filter-category').val();
+            var includeSubcats = this.container.find('#include-subcats').is(':checked');
+
+            // Get selected subcategories
+            var selectedSubIds = [];
+            if (includeSubcats) {
+                this.container.find('.subcat-custom-checkbox:checked').each(function () {
+                    selectedSubIds.push($(this).val());
+                });
+            }
 
             var filteredCourses = this.allData.courses.filter(function (c) {
                 var matchCourse = courseId === "" || c.id == courseId;
-                var matchCat = catId === "" || c.category == catId;
+
+                var matchCat = true;
+                if (catId !== "") {
+                    if (c.category == catId) {
+                        matchCat = true; // Exact match to main category
+                    } else if (includeSubcats) {
+                        // Check if it matches one of the selected subcategories
+                        // Note: We only added checkboxes for existing categories in data, so simple ID check is enough
+                        matchCat = selectedSubIds.includes(String(c.category));
+                    } else {
+                        matchCat = false;
+                    }
+                }
+
                 return matchCourse && matchCat;
             });
 

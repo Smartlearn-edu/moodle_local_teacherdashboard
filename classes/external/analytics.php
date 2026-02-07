@@ -48,13 +48,16 @@ class analytics extends external_api
         foreach ($courses as $course) {
             $coursecontext = \context_course::instance($course->id);
             if (\has_capability('moodle/course:update', $coursecontext)) {
+                $categoryid = isset($course->category) ? $course->category : 0;
                 $mycourses[] = [
                     'id' => $course->id,
                     'name' => $course->fullname,
-                    'category' => $course->category
+                    'category' => $categoryid
                 ];
                 $courseids[] = $course->id;
-                $categoryids[$course->category] = $course->category;
+                if ($categoryid) {
+                    $categoryids[$categoryid] = $categoryid;
+                }
             }
         }
 
@@ -62,14 +65,20 @@ class analytics extends external_api
             return ['courses' => [], 'students' => []];
         }
 
-        // Fetch category names
+        // Fetch category names and paths
         list($catsql, $catparams) = $DB->get_in_or_equal($categoryids);
-        $categories = $DB->get_records_select('course_categories', "id $catsql", $catparams, '', 'id, name');
+        $categories = $DB->get_records_select('course_categories', "id $catsql", $catparams, '', 'id, name, path');
 
-        // Enrich courses with category names
+        // Enrich courses with category names and paths
         foreach ($mycourses as &$course) {
             $catid = $course['category'];
-            $course['categoryname'] = isset($categories[$catid]) ? $categories[$catid]->name : 'Unknown';
+            if (isset($categories[$catid])) {
+                $course['categoryname'] = $categories[$catid]->name;
+                $course['categorypath'] = $categories[$catid]->path;
+            } else {
+                $course['categoryname'] = 'Unknown';
+                $course['categorypath'] = '';
+            }
         }
 
         // 2. Get students and their completion status across these courses
