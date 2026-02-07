@@ -17,7 +17,7 @@ $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/teacherdashboard/index.php'));
 $PAGE->set_title(get_string('pluginname', 'local_teacherdashboard'));
 $PAGE->set_heading(get_string('pluginname', 'local_teacherdashboard'));
-$PAGE->set_pagelayout('fluid');
+$PAGE->set_pagelayout('report');
 
 require_login();
 
