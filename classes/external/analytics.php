@@ -26,6 +26,16 @@ class analytics extends external_api
     }
 
     /**
+     * Parameters for detailed student progress
+     */
+    public static function get_student_detailed_progress_parameters()
+    {
+        return new external_function_parameters([
+            'studentid' => new external_value(PARAM_INT, 'Student ID')
+        ]);
+    }
+
+    /**
      * Get cross-course progress data
      * @return array
      */
@@ -165,31 +175,178 @@ class analytics extends external_api
     }
 
     /**
+     * Get detailed progress for a specific student
+     */
+    public static function get_student_detailed_progress($studentid)
+    {
+        global $DB, $USER, $CFG;
+
+        require_once($CFG->libdir . '/completionlib.php');
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $params = self::validate_parameters(self::get_student_detailed_progress_parameters(), ['studentid' => $studentid]);
+        $context = \context_system::instance();
+        self::validate_context($context);
+
+        // 1. Get Teacher's Courses
+        $teacher_courses = \enrol_get_users_courses($USER->id, true, 'id, fullname, shortname');
+
+        // 2. Filter for Shared Courses (User is enrolled)
+        $shared_courses = [];
+        foreach ($teacher_courses as $course) {
+            $c_context = \context_course::instance($course->id);
+            if (\is_enrolled($c_context, $studentid)) {
+                $shared_courses[] = $course;
+            }
+        }
+
+        if (empty($shared_courses)) {
+            // Fetch student name anyway if possible, or return empty
+            // Ideally check if user exists first
+            return ['student' => ['id' => $studentid, 'fullname' => 'Unknown', 'email' => ''], 'courses' => []];
+        }
+
+        // Get Student Details
+        $student = $DB->get_record('user', ['id' => $studentid], 'id, firstname, lastname, email', MUST_EXIST);
+        $student_data = [
+            'id' => $student->id,
+            'fullname' => \fullname($student),
+            'email' => $student->email
+        ];
+
+        $courses_data = [];
+
+        foreach ($shared_courses as $course) {
+            $course_info = [
+                'id' => $course->id,
+                'fullname' => $course->fullname,
+                'activities' => []
+            ];
+
+            $modinfo = \get_fast_modinfo($course, $studentid);
+            $completion = new \completion_info($course);
+            $is_completion_enabled = $completion->is_enabled();
+
+            // Get grades for all items in course for this user efficiently
+            // We use key: itemmodule, iteminstance => grade
+            $grades = [];
+            // Querying grades (Lightweight version)
+            $sql = "SELECT i.itemmodule, i.iteminstance, g.finalgrade 
+                    FROM {grade_items} i
+                    JOIN {grade_grades} g ON g.itemid = i.id
+                    WHERE i.courseid = :courseid AND i.itemtype = 'mod' AND g.userid = :userid";
+            $grade_records = $DB->get_records_sql($sql, ['courseid' => $course->id, 'userid' => $studentid]);
+            foreach ($grade_records as $rec) {
+                $grades[$rec->itemmodule][$rec->iteminstance] = $rec->finalgrade;
+            }
+
+            foreach ($modinfo->cms as $cm) {
+                // Filter: Must have completion or be a gradeable activity
+                // Only "visible" activities
+                if (!$cm->uservisible) continue;
+
+                // Exclude labels unless they have completion?
+                if ($cm->modname == 'label' && $cm->completion == COMPLETION_TRACKING_NONE) continue;
+
+                $activity = [
+                    'id' => $cm->id,
+                    'name' => $cm->name,
+                    'type' => $cm->modname,
+                    'completed' => false,
+                    'status' => 'Pending',
+                    'grade' => ''
+                ];
+
+                // Completion
+                if ($is_completion_enabled && $cm->completion != COMPLETION_TRACKING_NONE) {
+                    $completion_data = $completion->get_data($cm, true, $studentid);
+                    if (
+                        $completion_data->completionstate == COMPLETION_COMPLETE ||
+                        $completion_data->completionstate == COMPLETION_COMPLETE_PASS ||
+                        $completion_data->completionstate == COMPLETION_COMPLETE_FAIL
+                    ) {
+                        $activity['completed'] = true;
+                        $activity['status'] = 'Completed';
+
+                        if ($completion_data->completionstate == COMPLETION_COMPLETE_PASS) $activity['status'] = 'Passed';
+                        if ($completion_data->completionstate == COMPLETION_COMPLETE_FAIL) $activity['status'] = 'Failed';
+                    }
+                } else {
+                    $activity['status'] = 'No Tracking';
+                }
+
+                // Grade
+                if (isset($grades[$cm->modname][$cm->instance])) {
+                    $raw_grade = $grades[$cm->modname][$cm->instance];
+                    if (!is_null($raw_grade)) {
+                        $activity['grade'] = \format_float($raw_grade, 2);
+                    }
+                }
+
+                $course_info['activities'][] = $activity;
+            }
+            $courses_data[] = $course_info;
+        }
+
+        return [
+            'student' => $student_data,
+            'courses' => $courses_data
+        ];
+    }
+
+    /**
      * Returns description of method result value
      * @return \external_single_structure
      */
     public static function get_cross_course_progress_returns()
     {
-        return new \external_single_structure([
-            'courses' => new \external_multiple_structure(
-                new \external_single_structure([
-                    'id' => new \external_value(\PARAM_INT, 'Course ID'),
-                    'name' => new \external_value(\PARAM_TEXT, 'Course Name'),
-                    'category' => new \external_value(\PARAM_INT, 'Category ID'),
-                    'categoryname' => new \external_value(\PARAM_TEXT, 'Category Name'),
-                    'categorypath' => new \external_value(\PARAM_TEXT, 'Category Path')
+        return new external_single_structure([
+            'courses' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(PARAM_INT, 'Course ID'),
+                    'name' => new external_value(PARAM_TEXT, 'Course Name'),
+                    'category' => new external_value(PARAM_INT, 'Category ID'),
+                    'categoryname' => new external_value(PARAM_TEXT, 'Category Name'),
+                    'categorypath' => new external_value(PARAM_TEXT, 'Category Path')
                 ])
             ),
-            'students' => new \external_multiple_structure(
-                new \external_single_structure([
-                    'id' => new \external_value(\PARAM_INT, 'Student ID'),
-                    'name' => new \external_value(\PARAM_TEXT, 'Student Name'),
-                    'email' => new \external_value(\PARAM_TEXT, 'Student Email'),
-                    'completions' => new \external_multiple_structure(
-                        new \external_single_structure([
-                            'courseid' => new \external_value(\PARAM_INT, 'Course ID'),
-                            'enrolled' => new \external_value(\PARAM_BOOL, 'Is enrolled?'),
-                            'completed' => new \external_value(\PARAM_BOOL, 'Is completed?')
+            'students' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(PARAM_INT, 'Student ID'),
+                    'name' => new external_value(PARAM_TEXT, 'Student Name'),
+                    'email' => new external_value(PARAM_TEXT, 'Student Email'),
+                    'completions' => new external_multiple_structure(
+                        new external_single_structure([
+                            'courseid' => new external_value(PARAM_INT, 'Course ID'),
+                            'enrolled' => new external_value(PARAM_BOOL, 'Is enrolled?'),
+                            'completed' => new external_value(PARAM_BOOL, 'Is completed?')
+                        ])
+                    )
+                ])
+            )
+        ]);
+    }
+
+    public static function get_student_detailed_progress_returns()
+    {
+        return new external_single_structure([
+            'student' => new external_single_structure([
+                'id' => new external_value(PARAM_INT, 'ID'),
+                'fullname' => new external_value(PARAM_TEXT, 'Name'),
+                'email' => new external_value(PARAM_TEXT, 'Email'),
+            ]),
+            'courses' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(PARAM_INT, 'Course ID'),
+                    'fullname' => new external_value(PARAM_TEXT, 'Course Name'),
+                    'activities' => new external_multiple_structure(
+                        new external_single_structure([
+                            'id' => new external_value(PARAM_INT, 'CM ID'),
+                            'name' => new external_value(PARAM_TEXT, 'Activity Name'),
+                            'type' => new external_value(PARAM_TEXT, 'Module Type'),
+                            'completed' => new external_value(PARAM_BOOL, 'Completed?'),
+                            'status' => new external_value(PARAM_TEXT, 'Status Text'),
+                            'grade' => new external_value(PARAM_TEXT, 'Grade')
                         ])
                     )
                 ])

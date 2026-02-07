@@ -14,7 +14,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             this.container.html('<div class="text-center p-5"><i class="fa fa-spinner fa-spin fa-3x"></i></div>');
 
             console.log('Fetching analytics data...');
-            Ajax.call([{
+            return Ajax.call([{
                 methodname: 'local_teacherdashboard_get_cross_course_progress',
                 args: {}
             }])[0].done(function (response) {
@@ -274,10 +274,10 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                     filteredCourses.forEach(function (course) {
                         var comp = getCompletion(student, course.id);
                         if (comp && comp.enrolled) {
-                             if (status === 'completed' && comp.completed) hasMatch = true;
-                             // "Not Completed": Enrolled but NOT completed
-                             if (status === 'not_completed' && !comp.completed) hasMatch = true;
-                             if (status === 'enrolled') hasMatch = true;
+                            if (status === 'completed' && comp.completed) hasMatch = true;
+                            // "Not Completed": Enrolled but NOT completed
+                            if (status === 'not_completed' && !comp.completed) hasMatch = true;
+                            if (status === 'enrolled') hasMatch = true;
                         }
                     });
                     return hasMatch;
@@ -617,30 +617,161 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 modal.hide();
                 Notification.exception(ex);
             });
+        },
+
+        /**
+         * DETAILED PROGRESS SECTION
+         */
+        initDetailed: function () {
+            var self = this;
+            this.detailedContainer = $('#section-progress-detailed');
+            this.detailedContent = $('#detailed-progress-content');
+
+            // Populate Student Select if data exists
+            if (this.allData && this.allData.students) {
+                this.populateStudentSelect(this.allData.students);
+            } else {
+                // If accessed directly without loading main data first 
+                this.loadData().then(function () {
+                    self.populateStudentSelect(self.allData.students);
+                });
+            }
+
+            // Event Listeners
+            this.detailedContainer.find('#detailed-student-select').off('change').on('change', function () {
+                var studentId = $(this).val();
+                if (studentId) {
+                    self.loadDetailedData(studentId);
+                } else {
+                    self.detailedContent.html('<p class="text-muted text-center py-5">Select a student to view details.</p>');
+                }
+            });
+
+            this.detailedContainer.find('#detailed-activity-filter').off('change').on('change', function () {
+                self.renderDetailed(); // Re-render with existing detailedData
+            });
+        },
+
+        populateStudentSelect: function (students) {
+            var $select = this.detailedContainer.find('#detailed-student-select');
+            $select.empty();
+            $select.append('<option value="">Choose a student...</option>');
+
+            // Sort by name
+            var sorted = students.slice().sort(function (a, b) {
+                return (a.name || '').localeCompare(b.name || '');
+            });
+
+            sorted.forEach(function (s) {
+                $select.append('<option value="' + s.id + '">' + s.name + '</option>');
+            });
+        },
+
+        loadDetailedData: function (studentId) {
+            var self = this;
+            this.detailedContent.html('<div class="text-center p-5"><i class="fa fa-spinner fa-spin fa-3x"></i></div>');
+
+            Ajax.call([{
+                methodname: 'local_teacherdashboard_get_student_detailed_progress',
+                args: { studentid: studentId }
+            }])[0].done(function (response) {
+                self.detailedData = response;
+                self.renderDetailed();
+            }).fail(function (ex) {
+                self.detailedContent.html('<div class="alert alert-danger">Error: ' + ex.message + '</div>');
+            });
+        },
+
+        renderDetailed: function () {
+            if (!this.detailedData) return;
+            var data = this.detailedData;
+            var filterType = this.detailedContainer.find('#detailed-activity-filter').val();
+
+            var html = '';
+
+            if (data.courses.length === 0) {
+                html = '<div class="alert alert-warning">No shared courses found for this student.</div>';
+                this.detailedContent.html(html);
+                return;
+            }
+
+            var hasActivities = false;
+
+            data.courses.forEach(function (course) {
+                // Filter activities
+                var activities = course.activities;
+                if (filterType) {
+                    activities = activities.filter(function (a) { return a.type === filterType; });
+                }
+
+                if (activities.length === 0) return; // Skip empty courses if filtered
+                hasActivities = true;
+
+                html += '<div class="card mb-4 shadow-sm animate__animated animate__fadeIn">';
+                html += '<div class="card-header bg-light fw-bold">' + course.fullname + '</div>';
+                html += '<div class="card-body p-0 table-responsive">';
+                html += '<table class="table table-hover mb-0">';
+                html += '<thead><tr><th>Activity</th><th>Type</th><th>Status</th><th>Grade</th></tr></thead>';
+                html += '<tbody>';
+
+                activities.forEach(function (act) {
+                    var statusBadge = '';
+                    if (act.status === 'Completed') statusBadge = '<span class="badge bg-success">Completed</span>';
+                    else if (act.status === 'Passed') statusBadge = '<span class="badge bg-success">Passed</span>';
+                    else if (act.status === 'Failed') statusBadge = '<span class="badge bg-danger">Failed</span>';
+                    else if (act.status === 'Pending') statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
+                    else statusBadge = '<span class="badge bg-secondary">' + act.status + '</span>';
+
+                    html += '<tr>';
+                    html += '<td>' + act.name + '</td>';
+                    html += '<td><small class="text-muted">' + act.type + '</small></td>';
+                    html += '<td>' + statusBadge + '</td>';
+                    html += '<td>' + (act.grade ? act.grade : '-') + '</td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table></div></div>';
+            });
+
+            if (!hasActivities) {
+                html = '<div class="alert alert-info">No activities found matching the filter.</div>';
+            }
+
+            this.detailedContent.html(html);
         }
+
     };
 
-return {
-    init: function () {
-        var navLinks = $('#dashboard-sidebar-nav .nav-link');
+    return {
+            init: function () {
+                var navLinks = $('#dashboard-sidebar-nav .nav-link');
 
-        navLinks.on('click', function (e) {
-            e.preventDefault();
-            var targetId = $(this).data('target');
+                navLinks.on('click', function (e) {
+                    e.preventDefault();
+                    var targetId = $(this).data('target');
 
-            if (targetId) {
-                $('#dashboard-sidebar-nav .nav-link').removeClass('active');
-                $(this).addClass('active');
-                $('.dashboard-section').addClass('d-none');
-                $('#' + targetId).removeClass('d-none');
+                    if (targetId) {
+                        $('#dashboard-sidebar-nav .nav-link').removeClass('active');
+                        $(this).addClass('active');
+                        $('.dashboard-section').addClass('d-none');
+                        $('#' + targetId).removeClass('d-none');
 
-                // Init module if first time view
-                if (targetId === 'section-progress' && !$('#section-progress').data('loaded')) {
-                    ProgressTracker.init();
-                    $('#section-progress').data('loaded', true);
-                }
+                        // Init module if first time view
+                        if (targetId === 'section-progress') {
+                            if (!$('#section-progress').data('loaded')) {
+                                ProgressTracker.init();
+                                $('#section-progress').data('loaded', true);
+                            }
+                        } else if (targetId === 'section-progress-detailed') {
+                            // Always init detailed view logic to refetch students if dependent data missing, OR simply check flag
+                            // We can just call initDetailed which handles data checking
+                            if (!$('#section-progress-detailed').data('loaded')) {
+                                ProgressTracker.initDetailed();
+                                $('#section-progress-detailed').data('loaded', true);
+                            }
+                        }
+                    }
+                });
             }
-        });
-    }
-};
-});
+        };
+    });

@@ -13,9 +13,24 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-target="section-progress">
+                        <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#submenu-progress" aria-expanded="false" data-target="section-progress">
                             <i class="fa fa-users"></i> {{#str}}section_progress, local_teacherdashboard{{/str}}
+                            <i class="fa fa-chevron-down float-end small mt-1"></i>
                         </a>
+                        <div class="collapse" id="submenu-progress">
+                            <ul class="nav flex-column ms-3">
+                                <li class="nav-item">
+                                    <a class="nav-link small" href="#" data-target="section-progress">
+                                        <i class="fa fa-th-list me-1"></i> Overview
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link small" href="#" data-target="section-progress-detailed">
+                                        <i class="fa fa-user me-1"></i> Detailed
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-target="section-grading">
@@ -103,6 +118,35 @@
                         <h4><i class="fa fa-users text-info"></i> {{#str}}section_progress, local_teacherdashboard{{/str}}</h4>
                         <p>Student progress analytics will appear here.</p>
                         <!-- We will implement this next -->
+                    </div>
+                </div>
+
+                <!-- Detailed Progress Section -->
+                <div id="section-progress-detailed" class="dashboard-section d-none">
+                    <div class="card shadow-sm border-0">
+                         <div class="card-body">
+                             <h4 class="card-title mb-4"><i class="fa fa-user text-primary me-2"></i>Detailed Student Progress</h4>
+                             <div id="detailed-progress-controls" class="row mb-4">
+                                 <div class="col-md-6 mb-3">
+                                     <label class="form-label">Select Student</label>
+                                     <select id="detailed-student-select" class="form-select">
+                                         <option value="">Choose a student...</option>
+                                     </select>
+                                 </div>
+                                 <div class="col-md-6 mb-3">
+                                     <label class="form-label">Filter Activity Type</label>
+                                     <select id="detailed-activity-filter" class="form-select">
+                                         <option value="">All Activities</option>
+                                         <option value="assign">Assignments</option>
+                                         <option value="quiz">Quizzes</option>
+                                         <option value="forum">Forums</option>
+                                     </select>
+                                 </div>
+                             </div>
+                             <div id="detailed-progress-content">
+                                 <p class="text-muted text-center py-5">Select a student to view details.</p>
+                             </div>
+                         </div>
                     </div>
                 </div>
 

@@ -9,4 +9,11 @@ $functions = [
         'type'        => 'read',
         'ajax'        => true,
     ],
+    'local_teacherdashboard_get_student_detailed_progress' => [
+        'classname'   => 'local_teacherdashboard\external\analytics',
+        'methodname'  => 'get_student_detailed_progress',
+        'description' => 'Get detailed activity progress for a specific student',
+        'type'        => 'read',
+        'ajax'        => true,
+    ],
 ];
