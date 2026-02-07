@@ -3,34 +3,50 @@
 /* Import Font */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 
-/* --- Page-Level Overrides for Dark Mode --- */
+/* --- Page-Level Overrides for Dark Mode & Full Width --- */
 body.path-local-teacherdashboard {
     background-color: #2b2d3e !important;
     color: #e3e2e2;
     font-family: "DM Sans", sans-serif;
 }
 
-body.path-local-teacherdashboard #page,
+/* Force full width and remove default Moodle padding/margins */
 body.path-local-teacherdashboard #page-wrapper,
+body.path-local-teacherdashboard #page,
 body.path-local-teacherdashboard #page-content,
 body.path-local-teacherdashboard #region-main-box,
-body.path-local-teacherdashboard #region-main {
+body.path-local-teacherdashboard #region-main,
+body.path-local-teacherdashboard .container-fluid,
+body.path-local-teacherdashboard .container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
 }
 
-/* Hide or blend standard Moodle elements if necessary */
+/* Specific fix for Boost and other themes with drawers */
+body.path-local-teacherdashboard .drawer-content {
+    background-color: #2b2d3e !important;
+    padding: 0 !important;
+}
+
+/* Hide breadcrumbs and unnecessary headers if possible/desired for "App feel",
+   but for now just ensure they don't force white backgrounds */
 body.path-local-teacherdashboard .secondary-navigation {
     background-color: #1a1d21 !important;
     border-bottom: 1px solid #3e4152;
+    max-width: 100% !important;
 }
 
-/* --- Dashboard Container --- */
+/* Ensure our dashboard container takes available space */
 .path-local-teacherdashboard .dashboard-container {
     background-color: transparent;
     color: #e3e2e2;
     min-height: 100vh;
+    width: 100%;
 }
 
 /* Headings */
@@ -64,7 +80,11 @@ body.path-local-teacherdashboard .secondary-navigation {
     border-radius: 8px;
     margin-bottom: 5px;
     transition: all 0.2s ease;
-    font-weight: 400;
+    font-weight: 500;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
 }
 
 .teacherdashboard-sidebar .nav-link:hover {
