@@ -63,7 +63,7 @@ class analytics extends external_api
         // We fetch users who are enrolled in ANY of verify course ids.
         // We use a simplified query to get user details + course completion record.
 
-        list($insql, $inparams) = $DB->get_in_or_equal($courseids, \SQL_PARAMS_NAMED);
+        list($insql, $inparams) = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED);
 
         // Fetch unique students enrolled in these courses
         // Note: keeping it simple - checking enrollment via standard API is safer but this is a dashboard analytics query
@@ -127,19 +127,19 @@ class analytics extends external_api
         return new \external_single_structure([
             'courses' => new \external_multiple_structure(
                 new \external_single_structure([
-                    'id' => new \external_value(PARAM_INT, 'Course ID'),
-                    'name' => new \external_value(PARAM_TEXT, 'Course Name')
+                    'id' => new \external_value(\PARAM_INT, 'Course ID'),
+                    'name' => new \external_value(\PARAM_TEXT, 'Course Name')
                 ])
             ),
             'students' => new \external_multiple_structure(
                 new \external_single_structure([
-                    'id' => new \external_value(PARAM_INT, 'Student ID'),
-                    'name' => new \external_value(PARAM_TEXT, 'Student Name'),
-                    'email' => new \external_value(PARAM_TEXT, 'Student Email'),
+                    'id' => new \external_value(\PARAM_INT, 'Student ID'),
+                    'name' => new \external_value(\PARAM_TEXT, 'Student Name'),
+                    'email' => new \external_value(\PARAM_TEXT, 'Student Email'),
                     'completions' => new \external_multiple_structure(
                         new \external_single_structure([
-                            'courseid' => new \external_value(PARAM_INT, 'Course ID'),
-                            'completed' => new \external_value(PARAM_BOOL, 'Is completed?')
+                            'courseid' => new \external_value(\PARAM_INT, 'Course ID'),
+                            'completed' => new \external_value(\PARAM_BOOL, 'Is completed?')
                         ])
                     )
                 ])
