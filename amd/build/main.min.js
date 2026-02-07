@@ -42,20 +42,31 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 var allCompletedCount = 0;
 
                 // Calculate completion counts per course
-                var courseCompletions = new Array(courseCount).fill(0);
+                var courseStats = new Array(courseCount).fill(null).map(function () {
+                    return { completed: 0, enrolled: 0 };
+                });
 
                 data.students.forEach(function (student) {
-                    var studentCompletedAll = true;
+                    var studentEnrolledCount = 0;
+                    var studentCompletedCount = 0;
+
                     if (student.completions) {
                         student.completions.forEach(function (comp, index) {
-                            if (comp.completed) {
-                                courseCompletions[index]++;
-                            } else {
-                                studentCompletedAll = false;
+                            if (comp.enrolled) {
+                                studentEnrolledCount++;
+                                courseStats[index].enrolled++;
+                                if (comp.completed) {
+                                    courseStats[index].completed++;
+                                    studentCompletedCount++;
+                                }
                             }
                         });
                     }
-                    if (studentCompletedAll) allCompletedCount++;
+
+                    // Consider "Program Complete" if they completed all courses they are enrolled in (and enrolled in at least one)
+                    if (studentEnrolledCount > 0 && studentEnrolledCount === studentCompletedCount) {
+                        allCompletedCount++;
+                    }
                 });
 
                 // 1. Stats Cards
@@ -63,9 +74,10 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
 
                 if (data.courses) {
                     data.courses.forEach(function (course, index) {
+                        var stats = courseStats[index];
                         html += self.renderStatCard(
                             course.name,
-                            courseCompletions[index] + ' / ' + totalStudents + ' completed',
+                            stats.completed + ' / ' + stats.enrolled + ' completed',
                             'check-circle',
                             'bg-primary text-white'
                         );
@@ -99,6 +111,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 html += '<tbody>';
                 data.students.forEach(function (student) {
                     var completedCount = 0;
+                    var enrolledCount = 0;
                     var rowHtml = '<tr>';
                     rowHtml += '<td class="px-4 py-3">';
                     rowHtml += '<div class="fw-bold text-dark">' + (student.name || 'Unknown') + '</div>';
@@ -107,25 +120,32 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
 
                     if (student.completions) {
                         student.completions.forEach(function (comp) {
-                            if (comp.completed) {
-                                completedCount++;
-                                rowHtml += '<td class="text-center"><i class="fa fa-check-circle text-success fa-lg"></i></td>';
+                            if (!comp.enrolled) {
+                                // Not Enrolled - Greyed out
+                                rowHtml += '<td class="text-center"><i class="fa fa-circle text-muted opacity-10" title="Not Enrolled"></i></td>';
                             } else {
-                                rowHtml += '<td class="text-center"><i class="fa fa-circle-thin text-muted opacity-25"></i></td>';
+                                enrolledCount++;
+                                if (comp.completed) {
+                                    completedCount++;
+                                    rowHtml += '<td class="text-center"><i class="fa fa-check-circle text-success fa-lg" title="Completed"></i></td>';
+                                } else {
+                                    rowHtml += '<td class="text-center"><i class="fa fa-circle-thin text-muted opacity-25" title="Enrolled, Not Completed"></i></td>';
+                                }
                             }
                         });
                     }
 
                     // Progress Bar
-                    var percentage = courseCount > 0 ? (completedCount / courseCount) * 100 : 0;
+                    // Calculate percentage based on Enrolled courses only
+                    var percentage = enrolledCount > 0 ? (completedCount / enrolledCount) * 100 : 0;
                     var colorClass = percentage === 100 ? 'bg-success' : (percentage > 50 ? 'bg-info' : 'bg-warning');
 
                     rowHtml += '<td class="px-4 py-3" style="min-width: 150px">';
                     rowHtml += '<div class="d-flex align-items-center">';
-                    rowHtml += '<div class="progress flex-grow-1" style="height: 6px;">';
+                    rowHtml += '<div class="progress flex-grow-1" style="height: 6px; background-color: #e9ecef;">';
                     rowHtml += '<div class="progress-bar ' + colorClass + '" role="progressbar" style="width: ' + percentage + '%"></div>';
                     rowHtml += '</div>';
-                    rowHtml += '<span class="ms-2 small fw-bold text-muted">' + completedCount + '/' + courseCount + '</span>';
+                    rowHtml += '<span class="ms-2 small fw-bold text-muted">' + completedCount + '/' + enrolledCount + '</span>';
                     rowHtml += '</div></td>';
 
                     rowHtml += '</tr>';

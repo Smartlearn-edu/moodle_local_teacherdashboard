@@ -79,6 +79,21 @@ class analytics extends external_api
 
         $students = $DB->get_records_sql($sql, $inparams);
 
+        // 3. Fetch specific enrollments for these students in these courses to account for non-enrollments
+        // The previous query only guaranteed the student is enrolled in AT LEAST ONE of the courses.
+        // We need to know exactly which ones.
+        $enrolsql = "SELECT ue.userid, e.courseid
+                       FROM {user_enrolments} ue
+                       JOIN {enrol} e ON e.id = ue.enrolid
+                      WHERE ue.userid IN (" . implode(',', array_keys($students)) . ")
+                        AND e.courseid $insql";
+        $enrollments = $DB->get_records_sql($enrolsql, $inparams);
+
+        $enrollmentMap = [];
+        foreach ($enrollments as $e) {
+            $enrollmentMap[$e->userid][$e->courseid] = true;
+        }
+
         // Fetch completion states
         $completesql = "SELECT userid, course, timecompleted
                           FROM {course_completions}
@@ -102,10 +117,14 @@ class analytics extends external_api
             ];
 
             foreach ($courseids as $cid) {
-                // Check if completed
+                // Check if enrolled
+                $isEnrolled = isset($enrollmentMap[$student->id][$cid]);
+                // Check if completed (must be enrolled to be logically completed usually, but data might persist)
                 $isCompleted = isset($completionMap[$student->id][$cid]);
+
                 $studentContext['completions'][] = [
                     'courseid' => $cid,
+                    'enrolled' => $isEnrolled,
                     'completed' => $isCompleted
                 ];
             }
@@ -139,6 +158,7 @@ class analytics extends external_api
                     'completions' => new \external_multiple_structure(
                         new \external_single_structure([
                             'courseid' => new \external_value(\PARAM_INT, 'Course ID'),
+                            'enrolled' => new \external_value(\PARAM_BOOL, 'Is enrolled?'),
                             'completed' => new \external_value(\PARAM_BOOL, 'Is completed?')
                         ])
                     )
