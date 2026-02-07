@@ -83,11 +83,6 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
 
             html += '</div>'; // End col
 
-            // Export Button Column
-            html += '<div class="col-md-12 col-lg-4 mb-2 text-end align-self-start">';
-            html += '<button id="btn-export-csv" class="btn btn-outline-secondary"><i class="fa fa-download me-1"></i> Export Data</button>';
-            html += '</div>';
-
             html += '</div>'; // End row
 
             // Clear existing filters if re-rendering filters
@@ -114,8 +109,8 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 self.applyFilters();
             });
 
-            // Export Button Listener
-            this.container.find('#btn-export-csv').on('click', function () {
+            // Export Button Listener (Delegated because button is now re-rendered in render())
+            this.container.off('click', '#btn-export-csv').on('click', '#btn-export-csv', function () {
                 self.exportToCSV();
             });
         },
@@ -413,6 +408,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                     html += rowHtml;
                 });
                 html += '</tbody></table></div></div></div>';
+
+                // Export Button
+                html += '<div class="d-flex justify-content-end mt-3 mb-4">';
+                html += '<button id="btn-export-csv" class="btn btn-outline-secondary"><i class="fa fa-download me-1"></i> Export Data to CSV</button>';
+                html += '</div>';
 
                 html += '</div>'; // End dashboard content
 
