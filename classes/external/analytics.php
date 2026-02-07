@@ -79,10 +79,10 @@ class analytics extends external_api
 
         $students = $DB->get_records_sql($sql, $inparams);
 
-        // 3. Fetch specific enrollments for these students in these courses to account for non-enrollments
-        // The previous query only guaranteed the student is enrolled in AT LEAST ONE of the courses.
-        // We need to know exactly which ones.
-        $enrolsql = "SELECT ue.userid, e.courseid
+        // 3. Fetch specific enrollments for these students in these courses
+        // We use CONCAT to ensure unique keys so get_records_sql doesn't overwrite enrollments for the same user
+        $sql_concat = $DB->sql_concat('ue.userid', "'-'", 'e.courseid');
+        $enrolsql = "SELECT $sql_concat AS uniqueid, ue.userid, e.courseid
                        FROM {user_enrolments} ue
                        JOIN {enrol} e ON e.id = ue.enrolid
                       WHERE ue.userid IN (" . implode(',', array_keys($students)) . ")
@@ -95,7 +95,8 @@ class analytics extends external_api
         }
 
         // Fetch completion states
-        $completesql = "SELECT userid, course, timecompleted
+        $sql_concat_comp = $DB->sql_concat('userid', "'-'", 'course');
+        $completesql = "SELECT $sql_concat_comp AS uniqueid, userid, course, timecompleted
                           FROM {course_completions}
                          WHERE course $insql
                            AND timecompleted > 0";
