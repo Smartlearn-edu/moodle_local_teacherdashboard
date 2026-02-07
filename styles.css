@@ -1,39 +1,236 @@
-/* Sidebar Styles */
+/* Teacher Dashboard Dark Mode Styling */
+
+/* Import Font */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+/* --- Page-Level Overrides for Dark Mode --- */
+body.path-local-teacherdashboard {
+    background-color: #2b2d3e !important;
+    color: #e3e2e2;
+    font-family: "DM Sans", sans-serif;
+}
+
+body.path-local-teacherdashboard #page,
+body.path-local-teacherdashboard #page-wrapper,
+body.path-local-teacherdashboard #page-content,
+body.path-local-teacherdashboard #region-main-box,
+body.path-local-teacherdashboard #region-main {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Hide or blend standard Moodle elements if necessary */
+body.path-local-teacherdashboard .secondary-navigation {
+    background-color: #1a1d21 !important;
+    border-bottom: 1px solid #3e4152;
+}
+
+/* --- Dashboard Container --- */
+.path-local-teacherdashboard .dashboard-container {
+    background-color: transparent;
+    color: #e3e2e2;
+    min-height: 100vh;
+}
+
+/* Headings */
+.path-local-teacherdashboard h1,
+.path-local-teacherdashboard h2,
+.path-local-teacherdashboard h3,
+.path-local-teacherdashboard h4,
+.path-local-teacherdashboard h5,
+.path-local-teacherdashboard h6,
+.path-local-teacherdashboard .dashboard-title {
+    color: #dbdbdc !important;
+    font-weight: 500;
+}
+
+.path-local-teacherdashboard .text-muted {
+    color: #aeb0b5 !important;
+}
+
+/* Sidebar */
 .teacherdashboard-sidebar {
-    background-color: #1a1d21; /* Dark sleek background */
-    color: #b0b3b8;
-    min-height: 80vh; /* Adjust as needed */
-    padding: 20px 0;
+    background-color: #1a1d21;
+    border-right: 1px solid #3e4152;
+    height: 100%;
+    min-height: 80vh;
     border-radius: 12px;
-    margin-right: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .teacherdashboard-sidebar .nav-link {
-    color: #b0b3b8;
-    padding: 12px 24px;
+    color: #aeb0b5;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 5px;
     transition: all 0.2s ease;
-    border-left: 3px solid transparent;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .teacherdashboard-sidebar .nav-link:hover {
     color: #fff;
-    background-color: rgba(255,255,255,0.05);
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 .teacherdashboard-sidebar .nav-link.active {
     color: #fff;
-    background-color: rgba(59, 130, 246, 0.15); /* Subtle blue tint */
-    border-left-color: #3b82f6; /* Blue accent */
+    background-color: #3b82f6;
+    /* Accent Blue */
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .teacherdashboard-sidebar .nav-link i {
     width: 24px;
     text-align: center;
-    margin-right: 10px;
+    margin-right: 8px;
+    opacity: 0.8;
 }
 
-.dashboard-container {
-    padding-top: 20px;
+/* Cards & Sections */
+.path-local-teacherdashboard .card {
+    background-color: #2b2d3e;
+    border: 1px solid #3e4152;
+    border-radius: 12px;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+    margin-bottom: 20px;
+}
+
+/* Nested cards (like course cards or section cards) */
+.path-local-teacherdashboard .dashboard-section .card {
+    background-color: #323548;
+    border: none;
+}
+
+.path-local-teacherdashboard .card-header {
+    background-color: transparent;
+    border-bottom: 1px solid #3e4152;
+    color: #dbdbdc;
+    font-weight: 600;
+    padding: 15px 20px;
+}
+
+.path-local-teacherdashboard .card-body {
+    padding: 20px;
+}
+
+/* Course Cards Specifics */
+.path-local-teacherdashboard .course-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    background-color: #323548;
+}
+
+.path-local-teacherdashboard .course-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3) !important;
+}
+
+.path-local-teacherdashboard .card-img-top-wrapper {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    background-color: #252836 !important;
+}
+
+/* Links */
+.path-local-teacherdashboard a {
+    color: #60a5fa;
+}
+
+.path-local-teacherdashboard a:hover {
+    color: #93c5fd;
+    text-decoration: none;
+}
+
+.path-local-teacherdashboard .text-dark {
+    color: #e3e2e2 !important;
+}
+
+/* Forms & Inputs */
+.path-local-teacherdashboard .form-select,
+.path-local-teacherdashboard .form-control {
+    background-color: #1f222e;
+    border: 1px solid #3e4152;
+    color: #e3e2e2;
+    border-radius: 8px;
+}
+
+.path-local-teacherdashboard .form-select:focus,
+.path-local-teacherdashboard .form-control:focus {
+    background-color: #1f222e;
+    color: #fff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+}
+
+/* Tables */
+.path-local-teacherdashboard .table {
+    color: #e3e2e2;
+    --bs-table-bg: transparent;
+    --bs-table-color: #e3e2e2;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.05);
+    --bs-table-border-color: #3e4152;
+}
+
+.path-local-teacherdashboard .table thead th {
+    border-bottom: 2px solid #3e4152;
+    color: #aeb0b5;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: 12px;
+}
+
+.path-local-teacherdashboard .table td,
+.path-local-teacherdashboard .table th {
+    border-color: #3e4152;
+    vertical-align: middle;
+}
+
+/* List Groups */
+.path-local-teacherdashboard .list-group-item {
+    background-color: transparent;
+    border-color: #3e4152;
+    color: #e3e2e2;
+}
+
+/* Badges */
+.path-local-teacherdashboard .badge.bg-light {
+    background-color: #3e4152 !important;
+    color: #e3e2e2 !important;
+}
+
+/* Alerts */
+.path-local-teacherdashboard .alert {
+    background-color: #323548;
+    border-color: #3e4152;
+    color: #e3e2e2;
+}
+
+/* Utils */
+.path-local-teacherdashboard .bg-white {
+    background-color: #323548 !important;
+    color: #e3e2e2 !important;
+}
+
+.path-local-teacherdashboard .bg-light {
+    background-color: #252836 !important;
+    color: #e3e2e2 !important;
+}
+
+/* Buttons */
+.path-local-teacherdashboard .btn-outline-secondary {
+    color: #aeb0b5;
+    border-color: #3e4152;
+}
+
+.path-local-teacherdashboard .btn-outline-secondary:hover {
+    background-color: #3e4152;
+    color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .path-local-teacherdashboard .dashboard-container {
+        padding-top: 10px;
+    }
 }

@@ -1,7 +1,7 @@
 <div class="container-fluid dashboard-container p-0">
     <div class="row g-0">
         <!-- Sidebar -->
-        <div class="col-12 col-md-3 col-xl-2 bg-dark text-white min-vh-100 p-0 transform-sidebar">
+        <div class="col-12 col-md-3 col-xl-2 min-vh-100 p-0 transform-sidebar" style="background-color: #1a1d21;">
             <div class="teacherdashboard-sidebar p-3 sticky-top">
                 <div class="text-center mb-4 pt-2">
                      <h4 class="text-white">Dashboard</h4>
@@ -189,44 +189,4 @@ require(['local_teacherdashboard/main'], function(Main) {
 });
 {{/js}}
 
-<style>
-.dashboard-title {
-    font-weight: 700;
-    color: #333;
-}
-.teacherdashboard-sidebar .nav-link {
-    color: rgba(255,255,255,0.7);
-    padding: 10px 15px;
-    border-radius: 5px;
-    margin-bottom: 5px;
-    transition: all 0.2s;
-}
-.teacherdashboard-sidebar .nav-link:hover,
-.teacherdashboard-sidebar .nav-link.active {
-    color: #fff;
-    background-color: rgba(255,255,255,0.1);
-}
-.course-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.course-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
-}
-.object-fit-cover {
-    object-fit: cover;
-}
-/* Ensure sticky sidebar works well */
-.sticky-top {
-    z-index: 1020;
-}
-@media (max-width: 768px) {
-    .transform-sidebar {
-        min-height: auto !important;
-        margin-bottom: 1rem;
-    }
-    .dashboard-container {
-        padding-top: 1rem;
-    }
-}
-</style>
+
