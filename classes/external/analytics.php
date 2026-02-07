@@ -70,14 +70,18 @@ class analytics extends external_api
         // so we define "Student" as someone with a completion record or valid enrollment.
         // Let's rely on course_completions table which exists for enrolled users if completion is enabled.
 
+        // Fetch unique students enrolled in these courses
+        // Exclude the current user (teacher/admin) from the list
         $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
                   FROM {user} u
                   JOIN {user_enrolments} ue ON ue.userid = u.id
                   JOIN {enrol} e ON e.id = ue.enrolid
                  WHERE e.courseid $insql
-                   AND u.deleted = 0";
+                   AND u.deleted = 0
+                   AND u.id != :currentuserid";
 
-        $students = $DB->get_records_sql($sql, $inparams);
+        $studentparams = array_merge($inparams, ['currentuserid' => $USER->id]);
+        $students = $DB->get_records_sql($sql, $studentparams);
 
         // 3. Fetch specific enrollments for these students in these courses
         // We use CONCAT to ensure unique keys so get_records_sql doesn't overwrite enrollments for the same user
@@ -118,10 +122,10 @@ class analytics extends external_api
             ];
 
             foreach ($courseids as $cid) {
-                // Check if enrolled
-                $isEnrolled = isset($enrollmentMap[$student->id][$cid]);
-                // Check if completed (must be enrolled to be logically completed usually, but data might persist)
+                // Check if completed
                 $isCompleted = isset($completionMap[$student->id][$cid]);
+                // Check if enrolled (explicit enrollment OR has a completion record)
+                $isEnrolled = isset($enrollmentMap[$student->id][$cid]) || $isCompleted;
 
                 $studentContext['completions'][] = [
                     'courseid' => $cid,

@@ -121,15 +121,16 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                     if (student.completions) {
                         student.completions.forEach(function (comp) {
                             if (!comp.enrolled) {
-                                // Not Enrolled - Greyed out
-                                rowHtml += '<td class="text-center"><i class="fa fa-circle text-muted opacity-10" title="Not Enrolled"></i></td>';
+                                // Not Enrolled - Hollow/Light Grey (swapped from solid)
+                                rowHtml += '<td class="text-center"><i class="fa fa-circle-thin text-muted opacity-25" title="Not Enrolled"></i></td>';
                             } else {
                                 enrolledCount++;
                                 if (comp.completed) {
                                     completedCount++;
                                     rowHtml += '<td class="text-center"><i class="fa fa-check-circle text-success fa-lg" title="Completed"></i></td>';
                                 } else {
-                                    rowHtml += '<td class="text-center"><i class="fa fa-circle-thin text-muted opacity-25" title="Enrolled, Not Completed"></i></td>';
+                                    // Enrolled but Not Completed - Solid Grey (swapped from hollow)
+                                    rowHtml += '<td class="text-center"><i class="fa fa-circle text-muted opacity-50" title="Enrolled, Not Completed"></i></td>';
                                 }
                             }
                         });
