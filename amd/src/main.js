@@ -22,6 +22,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 self.container.find('.fa-spinner').parent().remove();
 
                 self.allData = response;
+                self.lastFilteredData = response; // Init for export
                 try {
                     self.renderFilters();
                     self.render(response);
@@ -78,10 +79,14 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
             html += '</div>';
             html += '<div id="subcategory-list" class="mt-2 ms-3 border-start ps-2" style="display:none;">';
             html += '<!-- Subcategories will be populated here -->';
-            html += '</div>';
             html += '</div>'; // End subcategory options
 
             html += '</div>'; // End col
+
+            // Export Button Column
+            html += '<div class="col-md-12 col-lg-4 mb-2 text-end align-self-start">';
+            html += '<button id="btn-export-csv" class="btn btn-outline-secondary"><i class="fa fa-download me-1"></i> Export Data</button>';
+            html += '</div>';
 
             html += '</div>'; // End row
 
@@ -107,6 +112,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
             // Event delegation for dynamic subcategory checkboxes
             this.container.on('change', '.subcat-custom-checkbox', function () {
                 self.applyFilters();
+            });
+
+            // Export Button Listener
+            this.container.find('#btn-export-csv').on('click', function () {
+                self.exportToCSV();
             });
         },
 
@@ -197,7 +207,74 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification'], function ($, Aj
                 students: this.allData.students
             };
 
+            this.lastFilteredData = filteredData; // Store for export
             this.render(filteredData);
+        },
+
+        exportToCSV: function () {
+            var data = this.lastFilteredData;
+            if (!data || !data.courses || data.courses.length === 0) {
+                Notification.alert('No Data', 'There is no data to export.');
+                return;
+            }
+
+            var csv = [];
+
+            // Header
+            var header = ['Student Name', 'Email'];
+            data.courses.forEach(function (c) {
+                // Remove commas from course name to avoid CSV breakages
+                header.push('Course: ' + c.name.replace(/,/g, ''));
+            });
+            header.push('Completed Count');
+            header.push('Enrolled Count');
+            csv.push(header.join(','));
+
+            // Helper
+            var getCompletion = function (student, courseId) {
+                if (!student.completions) return null;
+                return student.completions.find(function (c) { return c.courseid == courseId; });
+            };
+
+            data.students.forEach(function (student) {
+                var row = [];
+                // Escape quotes and wrap in quotes
+                row.push('"' + (student.name || '').replace(/"/g, '""') + '"');
+                row.push('"' + (student.email || '').replace(/"/g, '""') + '"');
+
+                var completedCount = 0;
+                var enrolledCount = 0;
+
+                data.courses.forEach(function (course) {
+                    var comp = getCompletion(student, course.id);
+                    if (comp) {
+                        if (comp.enrolled) {
+                            enrolledCount++;
+                            row.push(comp.completed ? 'Completed' : 'Enrolled');
+                            if (comp.completed) completedCount++;
+                        } else {
+                            row.push('Not Enrolled');
+                        }
+                    } else {
+                        row.push('N/A');
+                    }
+                });
+
+                row.push(completedCount);
+                row.push(enrolledCount);
+                csv.push(row.join(','));
+            });
+
+            var csvString = csv.join('\n');
+            var blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "student_progress_export.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         },
 
         render: function (data) {
