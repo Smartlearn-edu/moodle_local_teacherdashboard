@@ -52,6 +52,12 @@ class dashboard implements renderable, templatable
     /** @var bool $showClicked Whether the show button was clicked */
     protected $showClicked;
 
+    /** @var int $totalEnrollments Total enrollments (sum of all students in courses) */
+    protected $totalEnrollments;
+
+    /** @var int $uniqueStudents Unique students count */
+    protected $uniqueStudents;
+
     /**
      * Constructor.
      * 
@@ -60,14 +66,18 @@ class dashboard implements renderable, templatable
      * @param array $categories List of categories (for admins)
      * @param int $selectedCategory Selected category ID
      * @param bool $showClicked Whether the show button was clicked
+     * @param int $totalEnrollments
+     * @param int $uniqueStudents
      */
-    public function __construct($courses, $isPrivileged = false, $categories = [], $selectedCategory = 0, $showClicked = false)
+    public function __construct($courses, $isPrivileged = false, $categories = [], $selectedCategory = 0, $showClicked = false, $totalEnrollments = 0, $uniqueStudents = 0)
     {
         $this->coursesInput = $courses;
         $this->isPrivileged = $isPrivileged;
         $this->categories = $categories;
         $this->selectedCategory = $selectedCategory;
         $this->showClicked = $showClicked;
+        $this->totalEnrollments = $totalEnrollments;
+        $this->uniqueStudents = $uniqueStudents;
     }
 
     /**
@@ -85,6 +95,10 @@ class dashboard implements renderable, templatable
         $data->selectedcategory = $this->selectedCategory;
         $data->showclicked = $this->showClicked;
 
+        // Stats
+        $data->totalenrollments = $this->totalEnrollments;
+        $data->uniquestudents = $this->uniqueStudents;
+        $data->hasstats = ($this->totalEnrollments > 0);
         // dynamic title
         $data->dashboardtitle = $this->isPrivileged
             ? 'Admin / Manager Dashboard'
@@ -141,7 +155,19 @@ class dashboard implements renderable, templatable
             }
 
             // Count students
-            $studentcount = \count_enrolled_users($coursecontext);
+            // Count students (users with 'student' role)
+            global $DB;
+            $studentcount = $DB->count_records_sql(
+                "
+                SELECT COUNT(DISTINCT ra.userid)
+                  FROM {role_assignments} ra
+                  JOIN {context} ctx ON ctx.id = ra.contextid
+                  JOIN {role} r ON r.id = ra.roleid
+                 WHERE ctx.contextlevel = 50 
+                   AND ctx.instanceid = :courseid
+                   AND r.shortname = 'student'",
+                ['courseid' => $course->id]
+            );
 
             // Count submissions needing grading
             // We look for submissions that are submitted, latest, and do not have a grade (or grade < 0).

@@ -472,10 +472,13 @@ class analytics extends external_api
         list($insql, $inparams) = $DB->get_in_or_equal($target_course_ids);
 
         // 3. Calculate Stats
-        $sql_students = "SELECT COUNT(DISTINCT ue.userid) 
-                           FROM {user_enrolments} ue 
-                           JOIN {enrol} e ON e.id = ue.enrolid 
-                          WHERE e.courseid $insql";
+        $sql_students = "SELECT COUNT(DISTINCT ra.userid) 
+                           FROM {role_assignments} ra
+                           JOIN {context} ctx ON ctx.id = ra.contextid
+                           JOIN {role} r ON r.id = ra.roleid
+                          WHERE ctx.contextlevel = 50 
+                            AND ctx.instanceid $insql
+                            AND r.shortname = 'student'";
         $total_students = $DB->count_records_sql($sql_students, $inparams);
 
         $sql_teachers = "SELECT COUNT(DISTINCT ra.userid)
@@ -496,11 +499,13 @@ class analytics extends external_api
         $course_counts = $DB->get_records_sql_menu($sql, $inparams);
 
         // Student Count per Category
-        $sql = "SELECT c.category, COUNT(DISTINCT ue.userid) as cnt 
+        $sql = "SELECT c.category, COUNT(DISTINCT ra.userid) as cnt 
                   FROM {course} c 
-                  JOIN {enrol} e ON e.courseid = c.id
-                  JOIN {user_enrolments} ue ON ue.enrolid = e.id
+                  JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id
+                  JOIN {role} r ON r.id = ra.roleid
                  WHERE c.id $insql 
+                   AND r.shortname = 'student'
                  GROUP BY c.category";
         $student_counts = $DB->get_records_sql_menu($sql, $inparams);
 

@@ -94,6 +94,31 @@
                             </form>
                         </div>
                     </div>
+                   
+                    {{#hasstats}}
+                    <div class="card mb-4 border-0 shadow-sm animate__animated animate__fadeIn">
+                         <div class="card-body">
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="fw-bold mb-0 text-primary">
+                                        <span id="stat-display-value" class="display-6 fw-bold">{{totalenrollments}}</span>
+                                        <span id="stat-display-label" class="fs-5 text-muted ms-2">Total Enrollments</span>
+                                    </h5>
+                                </div>
+                                <div class="mt-3 mt-md-0">
+                                    <div class="btn-group" role="group" aria-label="Student Count Options">
+                                        <input type="radio" class="btn-check" name="stats-option" id="stat-opt-total" autocomplete="off" checked onclick="document.getElementById('stat-display-value').innerText='{{totalenrollments}}'; document.getElementById('stat-display-label').innerText='Total Enrollments';">
+                                        <label class="btn btn-outline-secondary" for="stat-opt-total" title="Sum of students in all courses (includes duplicates)">Direct Sum</label>
+
+                                        <input type="radio" class="btn-check" name="stats-option" id="stat-opt-unique" autocomplete="off" onclick="document.getElementById('stat-display-value').innerText='{{uniquestudents}}'; document.getElementById('stat-display-label').innerText='Unique Students';">
+                                        <label class="btn btn-outline-secondary" for="stat-opt-unique" title="Count of unique students (no duplicates)">Unique Students</label>
+                                    </div>
+                                </div>
+                            </div>
+                         </div>
+                    </div>
+                    {{/hasstats}}
+
                     {{/isprivileged}}
 
                     <div class="row course-grid">

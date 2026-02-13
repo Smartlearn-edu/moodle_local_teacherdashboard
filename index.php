@@ -98,6 +98,31 @@ if ($isPrivileged) {
         $sql .= " ORDER BY c.fullname ASC";
         // Enforce a limit to avoid crashing on huge sites if "All" is selected
         $courses = $DB->get_records_sql($sql, $params, 0, 500);
+
+        if (!empty($courses)) {
+            $course_ids = array_keys($courses);
+            list($insql, $inparams) = $DB->get_in_or_equal($course_ids, SQL_PARAMS_NAMED);
+
+            // Unique Students (No repeating)
+            $sql_unique = "SELECT COUNT(DISTINCT ra.userid)
+                             FROM {role_assignments} ra
+                             JOIN {context} ctx ON ctx.id = ra.contextid
+                             JOIN {role} r ON r.id = ra.roleid
+                            WHERE ctx.contextlevel = 50
+                              AND ctx.instanceid $insql
+                              AND r.shortname = 'student'";
+            $unique_students = $DB->count_records_sql($sql_unique, $inparams);
+
+            // Total Enrollments (Direct Sum)
+            $sql_enrollments = "SELECT COUNT(ra.userid)
+                                  FROM {role_assignments} ra
+                                  JOIN {context} ctx ON ctx.id = ra.contextid
+                                  JOIN {role} r ON r.id = ra.roleid
+                                 WHERE ctx.contextlevel = 50
+                                   AND ctx.instanceid $insql
+                                   AND r.shortname = 'student'";
+            $total_enrollments = $DB->count_records_sql($sql_enrollments, $inparams);
+        }
     }
 } else {
     // Teacher Mode: Existing behavior
@@ -115,7 +140,9 @@ $dashboard = new \local_teacherdashboard\output\dashboard(
     $isPrivileged,
     $categories_options,
     $selected_category,
-    $show_clicked
+    $show_clicked,
+    $total_enrollments ?? 0,
+    $unique_students ?? 0
 );
 
 // Render the template.
