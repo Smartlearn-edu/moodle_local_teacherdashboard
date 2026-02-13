@@ -43,16 +43,31 @@ class dashboard implements renderable, templatable
     /** @var bool $isPrivileged Whether user is Admin/Manager */
     protected $isPrivileged;
 
+    /** @var array $categories List of all categories for filter */
+    protected $categories;
+
+    /** @var int $selectedCategory Selected category ID */
+    protected $selectedCategory;
+
+    /** @var bool $showClicked Whether the show button was clicked */
+    protected $showClicked;
+
     /**
      * Constructor.
      * 
      * @param array $courses Raw course objects
      * @param bool $isPrivileged
+     * @param array $categories List of categories (for admins)
+     * @param int $selectedCategory Selected category ID
+     * @param bool $showClicked Whether the show button was clicked
      */
-    public function __construct($courses, $isPrivileged = false)
+    public function __construct($courses, $isPrivileged = false, $categories = [], $selectedCategory = 0, $showClicked = false)
     {
         $this->coursesInput = $courses;
         $this->isPrivileged = $isPrivileged;
+        $this->categories = $categories;
+        $this->selectedCategory = $selectedCategory;
+        $this->showClicked = $showClicked;
     }
 
     /**
@@ -66,6 +81,9 @@ class dashboard implements renderable, templatable
         $data = new stdClass();
         $data->courses = [];
         $data->isprivileged = $this->isPrivileged;
+        $data->categories = isset($this->categories) ? array_values($this->categories) : [];
+        $data->selectedcategory = $this->selectedCategory;
+        $data->showclicked = $this->showClicked;
 
         // dynamic title
         $data->dashboardtitle = $this->isPrivileged

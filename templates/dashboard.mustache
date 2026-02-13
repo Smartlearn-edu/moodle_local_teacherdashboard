@@ -69,8 +69,33 @@
             <!-- Content Sections -->
             <div id="content-container">
                 
-                <!-- Overview Section -->
                 <div id="section-overview" class="dashboard-section">
+                    
+                    {{#isprivileged}}
+                    <div class="card mb-4 border-0 shadow-sm animate__animated animate__fadeIn">
+                        <div class="card-body bg-light rounded">
+                            <form method="GET" action="">
+                                <div class="row align-items-end">
+                                    <div class="col-md-6 mb-3 mb-md-0">
+                                        <label class="form-label fw-bold text-muted small text-uppercase">Filter by Category</label>
+                                        <select name="categoryid" class="form-select">
+                                            <option value="0">Select a category...</option>
+                                            {{#categories}}
+                                            <option value="{{id}}" {{#selected}}selected{{/selected}}>{{{name}}}</option>
+                                            {{/categories}}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                         <button type="submit" name="show" value="1" class="btn btn-primary w-100">
+                                            <i class="fa fa-filter me-1"></i> Show Courses
+                                         </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {{/isprivileged}}
+
                     <div class="row course-grid">
                         {{#courses}}
                         <div class="col-md-6 col-xl-4 mb-4">
@@ -109,9 +134,26 @@
                         {{/courses}}
                         {{^courses}}
                         <div class="col-12">
-                            <div class="alert alert-info" role="alert">
-                                {{#str}}nocourses, local_teacherdashboard{{/str}}
-                            </div>
+                            {{#isprivileged}}
+                                {{^showclicked}}
+                                    <div class="alert alert-light border text-center p-5">
+                                        <i class="fa fa-search fa-3x text-muted mb-3 op-5"></i>
+                                        <h4 class="text-muted">Please select a category and click "Show Courses" to view data.</h4>
+                                        <p class="text-muted small">Select a specific category to filter results.</p>
+                                    </div>
+                                {{/showclicked}}
+                                {{#showclicked}}
+                                    <div class="alert alert-warning" role="alert">
+                                        <i class="fa fa-info-circle me-1"></i> No courses found matching your selection.
+                                    </div>
+                                {{/showclicked}}
+                            {{/isprivileged}}
+                            
+                            {{^isprivileged}}
+                                <div class="alert alert-info" role="alert">
+                                    {{#str}}nocourses, local_teacherdashboard{{/str}}
+                                </div>
+                            {{/isprivileged}}
                         </div>
                         {{/courses}}
                     </div>

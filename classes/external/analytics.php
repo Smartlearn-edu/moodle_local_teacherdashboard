@@ -150,13 +150,16 @@ class analytics extends external_api
 
         // 3. Fetch specific enrollments for these students in these courses
         // We use CONCAT to ensure unique keys so get_records_sql doesn't overwrite enrollments for the same user
-        $sql_concat = $DB->sql_concat('ue.userid', "'-'", 'e.courseid');
-        $enrolsql = "SELECT $sql_concat AS uniqueid, ue.userid, e.courseid
-                       FROM {user_enrolments} ue
-                       JOIN {enrol} e ON e.id = ue.enrolid
-                      WHERE ue.userid IN (" . implode(',', array_keys($students)) . ")
-                        AND e.courseid $insql";
-        $enrollments = $DB->get_records_sql($enrolsql, $inparams);
+        $enrollments = [];
+        if (!empty($students)) {
+            $sql_concat = $DB->sql_concat('ue.userid', "'-'", 'e.courseid');
+            $enrolsql = "SELECT $sql_concat AS uniqueid, ue.userid, e.courseid
+                           FROM {user_enrolments} ue
+                           JOIN {enrol} e ON e.id = ue.enrolid
+                          WHERE ue.userid IN (" . implode(',', array_keys($students)) . ")
+                            AND e.courseid $insql";
+            $enrollments = $DB->get_records_sql($enrolsql, $inparams);
+        }
 
         $enrollmentMap = [];
         foreach ($enrollments as $e) {
