@@ -58,6 +58,14 @@ class analytics extends external_api
     /**
      * Parameters for system analytics
      */
+    public static function get_payment_analytics_parameters()
+    {
+        return new external_function_parameters([
+            'categoryid' => new external_value(\PARAM_INT, 'Filter by Category ID', \VALUE_DEFAULT, 0),
+            'fromdate' => new external_value(\PARAM_INT, 'From Date Timestamp', \VALUE_DEFAULT, 0),
+            'todate' => new external_value(\PARAM_INT, 'To Date Timestamp', \VALUE_DEFAULT, 0)
+        ]);
+    }
 
 
     /**
@@ -530,6 +538,159 @@ class analytics extends external_api
         ];
     }
 
+
+    /**
+     * Get payment analytics data
+     */
+    public static function get_payment_analytics($categoryid = 0, $fromdate = 0, $todate = 0)
+    {
+        global $DB, $USER;
+
+        $params = self::validate_parameters(self::get_payment_analytics_parameters(), [
+            'categoryid' => $categoryid,
+            'fromdate' => $fromdate,
+            'todate' => $todate
+        ]);
+
+        $context = \context_system::instance();
+        if (!has_capability('moodle/site:config', $context) && !has_capability('moodle/course:create', $context) && !is_siteadmin()) {
+            throw new \moodle_exception('nopermissions', 'error', '', 'get payment analytics');
+        }
+
+        // 1. Resolve Categories
+        // Similar to system analytics, if category is selected, we get it and its children (if we want deep search)
+        // For simplicity, let's treat the filter as "courses within this category tree".
+
+        $catids = [];
+        if ($categoryid > 0) {
+            $catids[] = $categoryid;
+            // Get children
+            $category = $DB->get_record('course_categories', ['id' => $categoryid]);
+            if ($category) {
+                $children = $DB->get_records_select('course_categories', "path LIKE ?", [$category->path . '/%'], '', 'id');
+                foreach ($children as $child) {
+                    $catids[] = $child->id;
+                }
+            }
+        }
+
+        // 2. Find Courses with specific enrollment methods (paypal, fee, payment)
+        // We look for enrol instances in these categories
+        $enrol_methods = ['paypal', 'fee', 'payment', 'stripe']; // Add others if needed
+        list($emsql, $emparams) = $DB->get_in_or_equal($enrol_methods, SQL_PARAMS_NAMED, 'enrol');
+
+        $sql = "SELECT DISTINCT e.courseid, e.id as enrolid, e.enrol, e.cost, e.currency, c.category, c.fullname
+                  FROM {enrol} e
+                  JOIN {course} c ON c.id = e.courseid
+                 WHERE e.enrol $emsql 
+                   AND e.status = 0"; // Enabled instances only
+
+        $params = $emparams;
+
+        if (!empty($catids)) {
+            list($catsql, $catparams) = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'cat');
+            $sql .= " AND c.category $catsql";
+            $params = array_merge($params, $catparams);
+        }
+
+        $enrol_instances = $DB->get_records_sql($sql, $params);
+
+        if (empty($enrol_instances)) {
+            return [
+                'total_students' => 0,
+                'total_revenue' => 0,
+                'currency' => 'USD', // Default
+                'categories' => [],
+                'courses' => []
+            ];
+        }
+
+        // 3. For each instance, count valid enrollments within date range
+        $course_stats = []; // courseid => stats
+        $category_stats = []; // categoryid => stats
+
+        $total_students = 0;
+        $total_revenue = 0;
+        $currency = 'USD'; // Default, ideally we handle multi-currency, but let's take the first one found or default
+
+        foreach ($enrol_instances as $instance) {
+            if ($instance->currency) $currency = $instance->currency;
+
+            // Count students enrolled via this instance
+            // We check user_enrolments row
+            $uesql = "SELECT COUNT(ue.id) 
+                        FROM {user_enrolments} ue
+                       WHERE ue.enrolid = :enrolid
+                         AND ue.status = 0"; // Active enrollment
+
+            $ueparams = ['enrolid' => $instance->enrolid];
+
+            if ($fromdate > 0) {
+                $uesql .= " AND ue.timecreated >= :fromdate";
+                $ueparams['fromdate'] = $fromdate;
+            }
+            if ($todate > 0) {
+                $uesql .= " AND ue.timecreated <= :todate";
+                $ueparams['todate'] = $todate;
+            }
+
+            $count = $DB->count_records_sql($uesql, $ueparams);
+
+            if ($count > 0) {
+                $revenue = $count * $instance->cost;
+
+                // Aggregate Course Stats
+                if (!isset($course_stats[$instance->courseid])) {
+                    $course_stats[$instance->courseid] = [
+                        'id' => $instance->courseid,
+                        'name' => $instance->fullname,
+                        'category' => $instance->category,
+                        'student_count' => 0,
+                        'revenue' => 0
+                    ];
+                }
+                $course_stats[$instance->courseid]['student_count'] += $count;
+                $course_stats[$instance->courseid]['revenue'] += $revenue;
+
+                // Aggregate Category Stats
+                if (!isset($category_stats[$instance->category])) {
+                    // Get category name lazily or later
+                    $category_stats[$instance->category] = [
+                        'id' => $instance->category,
+                        'name' => 'Category ' . $instance->category, // Placeholder
+                        'student_count' => 0,
+                        'revenue' => 0
+                    ];
+                }
+                $category_stats[$instance->category]['student_count'] += $count;
+                $category_stats[$instance->category]['revenue'] += $revenue;
+
+                $total_students += $count;
+                $total_revenue += $revenue;
+            }
+        }
+
+        // Enrich Category Names
+        if (!empty($category_stats)) {
+            $cat_ids = array_keys($category_stats);
+            list($csql, $cparams) = $DB->get_in_or_equal($cat_ids);
+            $cats = $DB->get_records_select('course_categories', "id $csql", $cparams, '', 'id, name');
+            foreach ($cats as $c) {
+                if (isset($category_stats[$c->id])) {
+                    $category_stats[$c->id]['name'] = $c->name;
+                }
+            }
+        }
+
+        return [
+            'total_students' => $total_students,
+            'total_revenue' => (float)$total_revenue,
+            'currency' => $currency,
+            'categories' => array_values($category_stats),
+            'courses' => array_values($course_stats)
+        ];
+    }
+
     /**
      * Returns description of method result value
      * @return \external_single_structure
@@ -624,6 +785,34 @@ class analytics extends external_api
                             'grade' => new external_value(\PARAM_TEXT, 'Grade')
                         ])
                     )
+                ])
+            )
+        ]);
+    }
+
+    public static function get_payment_analytics_returns()
+    {
+        return new external_single_structure([
+            'total_students' => new external_value(\PARAM_INT, 'Total Students'),
+            'total_revenue' => new external_value(\PARAM_FLOAT, 'Total Revenue'),
+            'currency' => new external_value(\PARAM_TEXT, 'Currency'),
+            'categories' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(\PARAM_INT, 'Cat ID'),
+                    'name' => new external_value(\PARAM_TEXT, 'Name'),
+                    'student_count' => new external_value(\PARAM_INT, 'Student count'),
+                    'revenue' => new external_value(\PARAM_FLOAT, 'Revenue'),
+                    'teacher_count' => new external_value(\PARAM_INT, 'Teacher count', \VALUE_OPTIONAL),
+                    'course_count' => new external_value(\PARAM_INT, 'Course count', \VALUE_OPTIONAL)
+                ])
+            ),
+            'courses' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(\PARAM_INT, 'Course ID'),
+                    'name' => new external_value(\PARAM_TEXT, 'Course Name'),
+                    'category' => new external_value(\PARAM_INT, 'Category ID'),
+                    'student_count' => new external_value(\PARAM_INT, 'Student Count'),
+                    'revenue' => new external_value(\PARAM_FLOAT, 'Revenue')
                 ])
             )
         ]);
