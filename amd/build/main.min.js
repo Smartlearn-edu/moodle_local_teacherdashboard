@@ -863,6 +863,13 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
     var AdminAnalytics = {
         init: function () {
             this.container = $('#section-analytics');
+            this.currentFilters = {
+                categoryid: 0,
+                courseid: 0,
+                includesubcategories: true
+            };
+            this.filtersRendered = false;
+
             if (this.container.find('#chart-enrollments-category').length > 0) {
                 this.loadData();
             }
@@ -870,10 +877,13 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
         loadData: function () {
             var self = this;
-            console.log('Fetching System Analytics...');
+            // Show loading overlay or spinner on charts? 
+            // For now just console log.
+            console.log('Fetching System Analytics with filters:', this.currentFilters);
+
             Ajax.call([{
                 methodname: 'local_teacherdashboard_get_system_analytics',
-                args: {}
+                args: this.currentFilters
             }])[0].done(function (response) {
                 self.render(response);
             }).fail(function (ex) {
@@ -886,6 +896,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             console.log('Rendering system analytics data:', data);
             this.lastData = data; // Store for export
 
+            if (!this.filtersRendered) {
+                this.renderFilters(data.filter_options);
+                this.filtersRendered = true;
+            }
+
             this.renderStats(data);
             this.renderTable(data.categories);
             this.renderCharts(data);
@@ -894,6 +909,115 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             var self = this;
             $('#btn-admin-export').off('click').on('click', function () {
                 self.exportToCSV();
+            });
+        },
+
+        renderFilters: function (options) {
+            var self = this;
+            this.filterOptions = options; // Store for dependencies
+
+            var html = '<div class="row mb-4 animate__animated animate__fadeIn">';
+
+            // Course Filter
+            html += '<div class="col-md-4 mb-2">';
+            html += '<select id="admin-filter-course" class="form-select border-0 shadow-sm">';
+            html += '<option value="0">All Courses</option>';
+            options.courses.forEach(function (c) {
+                html += '<option value="' + c.id + '">' + c.name + '</option>';
+            });
+            html += '</select></div>';
+
+            // Category Filter
+            html += '<div class="col-md-4 mb-2">';
+            html += '<select id="admin-filter-category" class="form-select border-0 shadow-sm">';
+            html += '<option value="0">All Categories</option>';
+            options.categories.forEach(function (c) {
+                // Only show top level or all? Show all for now.
+                html += '<option value="' + c.id + '">' + c.name + '</option>';
+            });
+            html += '</select>';
+
+            // Subcategory Option
+            html += '<div id="admin-subcategory-options" class="mt-2 text-muted small" style="display:none;">';
+            html += '<div class="form-check form-switch">';
+            html += '<input class="form-check-input" type="checkbox" id="admin-include-subcats" checked>';
+            html += '<label class="form-check-label" for="admin-include-subcats">Include sub-categories</label>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '</div>'; // End col
+
+            // Filter Actions? Auto-apply on change.
+            html += '</div>'; // End row
+
+            // Prepend to container, before stats cards
+            this.container.prepend(html);
+
+            // Listeners
+            this.container.find('#admin-filter-category').on('change', function () {
+                self.currentFilters.categoryid = parseInt($(this).val());
+                self.currentFilters.courseid = 0; // Reset course when cat changes?
+                // Also reset course dropdown value
+                $('#admin-filter-course').val(0);
+
+                self.updateCourseOptions();
+                self.toggleSubcatOptions();
+                self.loadData();
+            });
+
+            this.container.find('#admin-filter-course').on('change', function () {
+                self.currentFilters.courseid = parseInt($(this).val());
+                // If course selected, maybe set category? (Optional, skipping for now)
+                self.loadData();
+            });
+
+            this.container.find('#admin-include-subcats').on('change', function () {
+                self.currentFilters.includesubcategories = $(this).is(':checked');
+                self.loadData();
+            });
+        },
+
+        toggleSubcatOptions: function () {
+            var catId = this.currentFilters.categoryid;
+            if (catId > 0) {
+                $('#admin-subcategory-options').show();
+            } else {
+                $('#admin-subcategory-options').hide();
+            }
+        },
+
+        updateCourseOptions: function () {
+            var catId = this.currentFilters.categoryid;
+            var $courseSelect = $('#admin-filter-course');
+            $courseSelect.empty();
+            $courseSelect.append('<option value="0">All Courses</option>');
+
+            // Helper to check subcategory
+            var isSubcategory = function (parentPath, catIdToCheck) {
+                // We need path info for this. backend sends {id, name, parent}. 
+                // It does NOT send path in filter_options.
+                // So we can only filter by DIRECT parent client-side unless we recursively find children.
+                // Or we update backend to send path.
+                // For now, let's just filter by direct category to be safe, or ALL if complex.
+                // Actually, let's use the list of categories to build a hierarchy map.
+                return false;
+            };
+
+            // To properly filter courses by "Category + Subcategories" client side, I need the structure.
+            // I'll filter by Direct Category for now. 
+            // If the user wants courses from subcats, they can select subcat.
+            // OR I just show ALL courses if Cat is 0. 
+            // If Cat > 0, show courses where course.category == catId.
+
+            var filteredCourses = this.filterOptions.courses;
+            if (catId > 0) {
+                filteredCourses = filteredCourses.filter(function (c) {
+                    return c.category == catId; // Strict equality check? id is int.
+                });
+            }
+
+            filteredCourses.forEach(function (c) {
+                $courseSelect.append('<option value="' + c.id + '">' + c.name + '</option>');
             });
         },
 
@@ -907,6 +1031,9 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         renderCharts: function (data) {
             var self = this;
             require(['core/chartjs'], function (ChartJS) {
+                // Determine if we need to destroy old charts?
+                // ChartJS usually needs canvas cleanup.
+
                 try {
                     self.renderCategoryChart(data.categories, ChartJS);
                     self.renderRatioChart(data.total_students, data.total_teachers, ChartJS);
@@ -920,7 +1047,23 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         },
 
         renderCategoryChart: function (categories, ChartJS) {
-            var ctx = document.getElementById('chart-enrollments-category');
+            // ... existing chart code ...
+            // We need to handle Chart destruction to animate/update correctly.
+            // Or just replace the canvas?
+
+            var canvasId = 'chart-enrollments-category';
+            var $canvasContainer = $('#' + canvasId).parent();
+            // Destroy existing chart instance if saved?
+            // Simple way: Clear container and re-add canvas
+            // $canvasContainer.html('<canvas id="' + canvasId + '"></canvas>');
+            // But verify container structure in template.
+            // Usually <div style="height:300px"><canvas id="..."></canvas></div>
+
+            // Recreating canvas is safest for ChartJS updates
+            $('#' + canvasId).remove();
+            $canvasContainer.append('<canvas id="' + canvasId + '"></canvas>');
+
+            var ctx = document.getElementById(canvasId);
             if (!ctx) return;
 
             var sorted = categories.slice().sort(function (a, b) { return b.student_count - a.student_count; });
@@ -959,7 +1102,12 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         },
 
         renderRatioChart: function (students, teachers, ChartJS) {
-            var ctx = document.getElementById('chart-user-ratio');
+            var canvasId = 'chart-user-ratio';
+            var $canvasContainer = $('#' + canvasId).parent();
+            $('#' + canvasId).remove();
+            $canvasContainer.append('<canvas id="' + canvasId + '"></canvas>');
+
+            var ctx = document.getElementById(canvasId);
             if (!ctx) return;
 
             new ChartJS(ctx, {
@@ -989,6 +1137,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         renderTable: function (categories) {
             var $tbody = $('#admin-analytics-table tbody');
             $tbody.empty();
+
+            if (categories.length === 0) {
+                $tbody.append('<tr><td colspan="5" class="text-center text-muted">No data found for this filter.</td></tr>');
+                return;
+            }
 
             categories.forEach(function (cat) {
                 var ratio = cat.teacher_count > 0 ? (cat.student_count / cat.teacher_count).toFixed(1) : '-';
