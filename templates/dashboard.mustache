@@ -56,7 +56,7 @@
             <!-- Header -->
             <div class="row mb-4 align-items-center">
                 <div class="col-12">
-                    <h2 class="dashboard-title">{{#str}}pluginname, local_teacherdashboard{{/str}}</h2>
+                    <h2 class="dashboard-title">{{dashboardtitle}}</h2>
                     <p class="text-muted" id="dashboard-subtitle">Welcome back! Here are the courses you are teaching.</p>
                 </div>
             </div>
@@ -164,10 +164,97 @@
 
                 <!-- Analytics Section (Placeholder) -->
                 <div id="section-analytics" class="dashboard-section d-none">
+                    {{#isprivileged}}
+                    <div class="card shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
+                        <div class="card-body">
+                            <h4 class="card-title mb-4"><i class="fa fa-bar-chart text-primary me-2"></i> System Analytics</h4>
+                            
+                            <!-- Key Metrics Row -->
+                             <div id="admin-stats-row" class="row mb-5">
+                                <div class="col-md-3">
+                                    <div class="p-3 border rounded bg-white text-dark text-center h-100 shadow-sm">
+                                        <h6 class="text-uppercase small text-muted">Total Students</h6>
+                                        <h2 id="total-students-count" class="fw-bold mb-0">-</h2>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="p-3 border rounded bg-white text-dark text-center h-100 shadow-sm">
+                                        <h6 class="text-uppercase small text-muted">Total Teachers</h6>
+                                        <h2 id="total-teachers-count" class="fw-bold mb-0">-</h2>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="p-3 border rounded bg-white text-dark text-center h-100 shadow-sm">
+                                        <h6 class="text-uppercase small text-muted">Active Courses</h6>
+                                        <h2 id="total-courses-count" class="fw-bold mb-0">-</h2>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="p-3 border rounded bg-white text-dark text-center h-100 shadow-sm">
+                                        <h6 class="text-uppercase small text-muted">Categories</h6>
+                                        <h2 id="total-categories-count" class="fw-bold mb-0">-</h2>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Charts Row -->
+                            <div class="row">
+                                <div class="col-md-8 mb-4">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-header bg-white border-0">
+                                            <h6 class="fw-bold mb-0">Enrollments per Category</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div style="position: relative; height: 300px; width: 100%;">
+                                                <canvas id="chart-enrollments-category"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-4">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="card-header bg-white border-0">
+                                            <h6 class="fw-bold mb-0">Student vs Teacher Ratio</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center">
+                                            <div style="position: relative; height: 250px; width: 100%;">
+                                                <canvas id="chart-user-ratio"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Detailed Table -->
+                            <div class="mt-4">
+                                <h5 class="mb-3">Detailed Category Statistics</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle" id="admin-analytics-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Category</th>
+                                                <th class="text-center">Courses</th>
+                                                <th class="text-center">Students</th>
+                                                <th class="text-center">Teachers</th>
+                                                <th class="text-center">Student/Teacher Ratio</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Computed Rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    {{/isprivileged}}
+                    {{^isprivileged}}
                     <div class="alert alert-light border">
                         <h4><i class="fa fa-bar-chart text-warning"></i> {{#str}}section_analytics, local_teacherdashboard{{/str}}</h4>
                         <p>Course analytics will appear here.</p>
                     </div>
+                    {{/isprivileged}}
                 </div>
                  
                  <!-- Settings Section (Placeholder) -->

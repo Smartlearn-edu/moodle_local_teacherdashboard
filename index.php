@@ -34,8 +34,11 @@ foreach ($allcourses as $course) {
     }
 }
 
+// Check for Admin/Manager privileges (System level)
+$isPrivileged = has_capability('moodle/site:config', $context) || has_capability('moodle/course:create', $context) || is_siteadmin();
+
 // Create renderable
-$dashboard = new \local_teacherdashboard\output\dashboard($teachercourses);
+$dashboard = new \local_teacherdashboard\output\dashboard($teachercourses, $isPrivileged);
 
 // Render the template.
 echo $OUTPUT->render_from_template('local_teacherdashboard/dashboard', $dashboard->export_for_template($OUTPUT));

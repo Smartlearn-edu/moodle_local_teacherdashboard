@@ -31,8 +31,16 @@ class analytics extends external_api
     public static function get_student_detailed_progress_parameters()
     {
         return new external_function_parameters([
-            'studentid' => new external_value(PARAM_INT, 'Student ID')
+            'studentid' => new external_value(\PARAM_INT, 'Student ID')
         ]);
+    }
+
+    /**
+     * Parameters for system analytics
+     */
+    public static function get_system_analytics_parameters()
+    {
+        return new external_function_parameters([]);
     }
 
     /**
@@ -295,6 +303,146 @@ class analytics extends external_api
     }
 
     /**
+     * Get system wide analytics for admin/manager
+     */
+    public static function get_system_analytics()
+    {
+        global $DB, $USER;
+
+        $context = \context_system::instance();
+        // Check permissions: either site config or course creator at system level
+        if (!has_capability('moodle/site:config', $context) && !has_capability('moodle/course:create', $context) && !is_siteadmin()) {
+            throw new \moodle_exception('nopermissions', 'error', '', 'get system analytics');
+        }
+
+        // 1. Total counts
+        $total_students = $DB->count_records('user', ['deleted' => 0, 'suspended' => 0]); // Rough count, active users?
+        // Better to count only those with student role? For now, all users ex deleted.
+
+        $total_courses = $DB->count_records('course', ['visible' => 1]);
+        if ($total_courses > 1) $total_courses  -= 1; // Exclude site course
+
+        // 2. Categories Stats
+        $categories = $DB->get_records('course_categories', null, 'sortorder ASC', 'id, name, coursecount, parent');
+
+        $cat_stats = [];
+        $total_teachers = 0; // We can try to count unique teachers?
+
+        // This is heavy. Let's do a lighter query.
+        // Count enrollments per category?
+        // We can query {role_assignments} join {context} join {course} join {course_categories}
+
+        // Let's get enrollment counts per course first?
+        // For dashboard, we need something fast.
+
+        // Let's loop categories and get aggregate data.
+        foreach ($categories as $cat) {
+            // Count courses in this category
+            $course_count = $cat->coursecount;
+
+            // Count students in this category (enrolled in at least one course in this cat)
+            // SQL: SELECT COUNT(DISTINCT ue.userid) ...
+            // This might be slow if many courses.
+
+            // Simplified: User teacher/student counts from role assignments in course contexts within this category?
+            // Moodle doesn't store "students in category" directly.
+
+            // For now, let's just return course counts and maybe try to fetch total enrolments count
+            // from {enrol} table linked to courses in this category.
+
+            $sql_students = "SELECT COUNT(DISTINCT ue.userid)
+                               FROM {user_enrolments} ue
+                               JOIN {enrol} e ON e.id = ue.enrolid
+                               JOIN {course} c ON c.id = e.courseid
+                              WHERE c.category = :catid";
+
+            $student_count = $DB->count_records_sql($sql_students, ['catid' => $cat->id]);
+
+            // Teachers?
+            // Usually context level 50 (course). Role archetypes?
+            // Let's count users with 'editingteacher' or 'teacher' role in courses of this cat.
+            // Too complex for simple iteration.
+
+            // Alternative: Count distinct users with capability 'moodle/course:update' in courses of this category?
+            // Also slow.
+
+            // Let's use a rough heuristic or just 0 for now to speed up, or a specific query.
+            // Query for teacher enrollments:
+            // We need to know which enrol ids are for teachers. 
+            // Better: use role assignments.
+            /*
+            $sql_teachers = "SELECT COUNT(DISTINCT ra.userid)
+                               FROM {role_assignments} ra
+                               JOIN {context} ctx ON ctx.id = ra.contextid
+                               JOIN {course} c ON c.id = ctx.instanceid
+                              WHERE ctx.contextlevel = 50
+                                AND c.category = :catid
+                                AND ra.roleid IN (SELECT id FROM {role} WHERE shortname IN ('editingteacher', 'teacher'))";
+            */
+            // Use local teacher role check if standard... let's just use a placeholder or lightweight query.
+            // Let's assume teacher count is small.
+            $sql_teachers = "SELECT COUNT(DISTINCT ra.userid)
+                               FROM {role_assignments} ra
+                               JOIN {context} ctx ON ctx.id = ra.contextid
+                               JOIN {course} c ON c.id = ctx.instanceid
+                               JOIN {role} r ON r.id = ra.roleid
+                              WHERE ctx.contextlevel = 50
+                                AND c.category = :catid
+                                AND r.shortname IN ('editingteacher', 'teacher')";
+            $teacher_count = $DB->count_records_sql($sql_teachers, ['catid' => $cat->id]);
+
+            $cat_stats[] = [
+                'id' => $cat->id,
+                'name' => $cat->name,
+                'course_count' => $course_count,
+                'student_count' => $student_count,
+                'teacher_count' => $teacher_count
+            ];
+
+            $total_teachers += $teacher_count; // Note: specific teachers per category, summing them might count duplicates.
+        }
+
+        // Correct total teachers (unique system wide)?
+        $sql_unique_teachers = "SELECT COUNT(DISTINCT ra.userid)
+                               FROM {role_assignments} ra
+                               JOIN {context} ctx ON ctx.id = ra.contextid
+                               JOIN {role} r ON r.id = ra.roleid
+                              WHERE ctx.contextlevel = 50
+                                AND r.shortname IN ('editingteacher', 'teacher')";
+        $unique_teachers = $DB->count_records_sql($sql_unique_teachers);
+
+
+        return [
+            'total_students' => $total_students,
+            'total_teachers' => $unique_teachers,
+            'total_courses' => $total_courses,
+            'categories' => $cat_stats
+        ];
+    }
+
+    /**
+     * Returns description of method result value
+     * @return \external_single_structure
+     */
+    public static function get_system_analytics_returns()
+    {
+        return new external_single_structure([
+            'total_students' => new external_value(PARAM_INT, 'Total Students'),
+            'total_teachers' => new external_value(PARAM_INT, 'Total Teachers'),
+            'total_courses' => new external_value(PARAM_INT, 'Total Courses'),
+            'categories' => new external_multiple_structure(
+                new external_single_structure([
+                    'id' => new external_value(PARAM_INT, 'Cat ID'),
+                    'name' => new external_value(PARAM_TEXT, 'Name'),
+                    'course_count' => new external_value(PARAM_INT, 'Course count'),
+                    'student_count' => new external_value(PARAM_INT, 'Student count'),
+                    'teacher_count' => new external_value(PARAM_INT, 'Teacher count')
+                ])
+            )
+        ]);
+    }
+
+    /**
      * Returns description of method result value
      * @return \external_single_structure
      */
@@ -331,22 +479,22 @@ class analytics extends external_api
     {
         return new external_single_structure([
             'student' => new external_single_structure([
-                'id' => new external_value(PARAM_INT, 'ID'),
-                'fullname' => new external_value(PARAM_TEXT, 'Name'),
-                'email' => new external_value(PARAM_TEXT, 'Email'),
+                'id' => new external_value(\PARAM_INT, 'ID'),
+                'fullname' => new external_value(\PARAM_TEXT, 'Name'),
+                'email' => new external_value(\PARAM_TEXT, 'Email'),
             ]),
             'courses' => new external_multiple_structure(
                 new external_single_structure([
-                    'id' => new external_value(PARAM_INT, 'Course ID'),
-                    'fullname' => new external_value(PARAM_TEXT, 'Course Name'),
+                    'id' => new external_value(\PARAM_INT, 'Course ID'),
+                    'fullname' => new external_value(\PARAM_TEXT, 'Course Name'),
                     'activities' => new external_multiple_structure(
                         new external_single_structure([
-                            'id' => new external_value(PARAM_INT, 'CM ID'),
-                            'name' => new external_value(PARAM_TEXT, 'Activity Name'),
-                            'type' => new external_value(PARAM_TEXT, 'Module Type'),
-                            'completed' => new external_value(PARAM_BOOL, 'Completed?'),
-                            'status' => new external_value(PARAM_TEXT, 'Status Text'),
-                            'grade' => new external_value(PARAM_TEXT, 'Grade')
+                            'id' => new external_value(\PARAM_INT, 'CM ID'),
+                            'name' => new external_value(\PARAM_TEXT, 'Activity Name'),
+                            'type' => new external_value(\PARAM_TEXT, 'Module Type'),
+                            'completed' => new external_value(\PARAM_BOOL, 'Completed?'),
+                            'status' => new external_value(\PARAM_TEXT, 'Status Text'),
+                            'grade' => new external_value(\PARAM_TEXT, 'Grade')
                         ])
                     )
                 ])

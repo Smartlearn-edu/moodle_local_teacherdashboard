@@ -9,6 +9,13 @@ $functions = [
         'type'        => 'read',
         'ajax'        => true,
     ],
+    'local_teacherdashboard_get_system_analytics' => [
+        'classname'   => 'local_teacherdashboard\external\analytics',
+        'methodname'  => 'get_system_analytics',
+        'description' => 'Get system wide analytics for admin',
+        'type'        => 'read',
+        'ajax'        => true,
+    ],
     'local_teacherdashboard_get_student_detailed_progress' => [
         'classname'   => 'local_teacherdashboard\external\analytics',
         'methodname'  => 'get_student_detailed_progress',

@@ -848,6 +848,142 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         }
     };
 
+    var AdminAnalytics = {
+        init: function () {
+            this.container = $('#section-analytics');
+            if (this.container.find('#chart-enrollments-category').length > 0) {
+                this.loadData();
+            }
+        },
+
+        loadData: function () {
+            var self = this;
+            console.log('Fetching System Analytics...');
+            Ajax.call([{
+                methodname: 'local_teacherdashboard_get_system_analytics',
+                args: {}
+            }])[0].done(function (response) {
+                self.render(response);
+            }).fail(function (ex) {
+                console.error('System Analytics Error:', ex);
+                self.container.find('.card-body').prepend('<div class="alert alert-danger">Error loading analytics: ' + ex.message + '</div>');
+            });
+        },
+
+        render: function (data) {
+            console.log('Rendering system analytics data:', data);
+            this.renderStats(data);
+            this.renderTable(data.categories);
+            this.renderCharts(data);
+        },
+
+        renderStats: function (data) {
+            $('#total-students-count').html(data.total_students);
+            $('#total-teachers-count').html(data.total_teachers);
+            $('#total-courses-count').html(data.total_courses);
+            $('#total-categories-count').html(data.categories.length);
+        },
+
+        renderCharts: function (data) {
+            var self = this;
+            require(['core/chartjs'], function (ChartJS) {
+                try {
+                    self.renderCategoryChart(data.categories, ChartJS);
+                    self.renderRatioChart(data.total_students, data.total_teachers, ChartJS);
+                } catch (e) {
+                    console.error('Error constructing charts:', e);
+                }
+            }, function (err) {
+                console.error('Failed to load core/chartjs:', err);
+                $('#chart-enrollments-category').parent().html('<div class="alert alert-warning small">Charts could not be loaded.</div>');
+            });
+        },
+
+        renderCategoryChart: function (categories, ChartJS) {
+            var ctx = document.getElementById('chart-enrollments-category');
+            if (!ctx) return;
+
+            var sorted = categories.slice().sort(function (a, b) { return b.student_count - a.student_count; });
+            var top = sorted.slice(0, 10);
+
+            var labels = top.map(function (c) { return c.name; });
+            var students = top.map(function (c) { return c.student_count; });
+            var teachers = top.map(function (c) { return c.teacher_count; });
+
+            new ChartJS(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Students',
+                        data: students,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Teachers',
+                        data: teachers,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        },
+
+        renderRatioChart: function (students, teachers, ChartJS) {
+            var ctx = document.getElementById('chart-user-ratio');
+            if (!ctx) return;
+
+            new ChartJS(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Students', 'Teachers'],
+                    datasets: [{
+                        data: [students, teachers],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 99, 132, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        },
+
+        renderTable: function (categories) {
+            var $tbody = $('#admin-analytics-table tbody');
+            $tbody.empty();
+
+            categories.forEach(function (cat) {
+                var ratio = cat.teacher_count > 0 ? (cat.student_count / cat.teacher_count).toFixed(1) : '-';
+                var html = '<tr>';
+                html += '<td>' + cat.name + '</td>';
+                html += '<td class="text-center">' + cat.course_count + '</td>';
+                html += '<td class="text-center">' + cat.student_count + '</td>';
+                html += '<td class="text-center">' + cat.teacher_count + '</td>';
+                html += '<td class="text-center">' + ratio + '</td>';
+                html += '</tr>';
+                $tbody.append(html);
+            });
+        }
+    };
+
     return {
         init: function () {
             var navLinks = $('#dashboard-sidebar-nav .nav-link');
@@ -879,6 +1015,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                         if (!$('#section-grading').data('loaded')) {
                             GradingTracker.init();
                             $('#section-grading').data('loaded', true);
+                        }
+                    } else if (targetId === 'section-analytics') {
+                        if (!$('#section-analytics').data('loaded')) {
+                            AdminAnalytics.init();
+                            $('#section-analytics').data('loaded', true);
                         }
                     }
                 }

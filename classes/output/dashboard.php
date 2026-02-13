@@ -20,14 +20,19 @@ class dashboard implements renderable, templatable
     /** @var array $courses List of courses data */
     protected $coursesInput;
 
+    /** @var bool $isPrivileged Whether user is Admin/Manager */
+    protected $isPrivileged;
+
     /**
      * Constructor.
      * 
      * @param array $courses Raw course objects
+     * @param bool $isPrivileged
      */
-    public function __construct($courses)
+    public function __construct($courses, $isPrivileged = false)
     {
         $this->coursesInput = $courses;
+        $this->isPrivileged = $isPrivileged;
     }
 
     /**
@@ -40,6 +45,12 @@ class dashboard implements renderable, templatable
     {
         $data = new stdClass();
         $data->courses = [];
+        $data->isprivileged = $this->isPrivileged;
+
+        // dynamic title
+        $data->dashboardtitle = $this->isPrivileged
+            ? 'Admin / Manager Dashboard'
+            : \get_string('pluginname', 'local_teacherdashboard');
 
         foreach ($this->coursesInput as $course) {
             $coursecontext = context_course::instance($course->id);
