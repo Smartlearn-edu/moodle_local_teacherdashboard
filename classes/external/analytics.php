@@ -112,7 +112,7 @@ class analytics extends external_api
 
         // Fetch unique students enrolled in these courses
         // Exclude the current user (teacher/admin) from the list
-        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.lastaccess
                   FROM {user} u
                   JOIN {user_enrolments} ue ON ue.userid = u.id
                   JOIN {enrol} e ON e.id = ue.enrolid
@@ -153,13 +153,22 @@ class analytics extends external_api
             $completionMap[$c->userid][$c->course] = true;
         }
 
+        $now = time();
+        $threeDays = 3 * 24 * 3600;
+        $sevenDays = 7 * 24 * 3600;
+        $fourteenDays = 14 * 24 * 3600;
+
         foreach ($students as $student) {
             $studentContext = [
                 'id' => $student->id,
                 'name' => \fullname($student),
                 'email' => $student->email,
+                'lastaccess' => $student->lastaccess, // Add last access timestamp
                 'completions' => []
             ];
+
+            $enrolledCount = 0;
+            $completedCount = 0;
 
             foreach ($courseids as $cid) {
                 // Check if completed
@@ -167,12 +176,50 @@ class analytics extends external_api
                 // Check if enrolled (explicit enrollment OR has a completion record)
                 $isEnrolled = isset($enrollmentMap[$student->id][$cid]) || $isCompleted;
 
+                if ($isEnrolled) {
+                    $enrolledCount++;
+                    if ($isCompleted) {
+                        $completedCount++;
+                    }
+                }
+
                 $studentContext['completions'][] = [
                     'courseid' => $cid,
                     'enrolled' => $isEnrolled,
                     'completed' => $isCompleted
                 ];
             }
+
+            // Calculate Engagement Score (0-100)
+            // 1. Recency Score (50%)
+            $recencyScore = 0;
+            if ($student->lastaccess > 0) {
+                $diff = $now - $student->lastaccess;
+                if ($diff < $threeDays) {
+                    $recencyScore = 100;
+                } else if ($diff < $sevenDays) {
+                    $recencyScore = 70;
+                } else if ($diff < $fourteenDays) {
+                    $recencyScore = 40;
+                } else {
+                    $recencyScore = 10;
+                }
+            }
+
+            // 2. Completion Score (50%)
+            // Completion rate relative to enrolled courses
+            $completionScore = 0;
+            if ($enrolledCount > 0) {
+                $completionScore = ($completedCount / $enrolledCount) * 100;
+            }
+
+            // Final Weighted Score
+            // Adjust weights as needed. Recency is heavily weighted for "current engagement".
+            // Let's do 60% recency, 40% completion (since completion takes a long time).
+            $engagementScore = ($recencyScore * 0.6) + ($completionScore * 0.4);
+
+            $studentContext['engagement_score'] = (int) round($engagementScore);
+
             $studentData[] = $studentContext;
         }
 
@@ -460,9 +507,10 @@ class analytics extends external_api
             ),
             'students' => new external_multiple_structure(
                 new external_single_structure([
-                    'id' => new external_value(PARAM_INT, 'Student ID'),
-                    'name' => new external_value(PARAM_TEXT, 'Student Name'),
-                    'email' => new external_value(PARAM_TEXT, 'Student Email'),
+                    'id' => new external_value(\PARAM_INT, 'Student ID'),
+                    'name' => new external_value(\PARAM_TEXT, 'Student Name'),
+                    'email' => new external_value(\PARAM_TEXT, 'Student Email'),
+                    'engagement_score' => new external_value(\PARAM_INT, 'Engagement Score (0-100)', \VALUE_OPTIONAL),
                     'completions' => new external_multiple_structure(
                         new external_single_structure([
                             'courseid' => new external_value(PARAM_INT, 'Course ID'),

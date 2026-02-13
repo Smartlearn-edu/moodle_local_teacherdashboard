@@ -445,6 +445,8 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 html += '</div></th>';
 
                 html += '<th class="border-0 px-4 py-3">Student Name</th>';
+                html += '<th class="text-center border-0 px-4 py-3">Engagement</th>';
+
                 visibleCourses.forEach(function (course) {
                     html += '<th class="text-center border-0 px-4 py-3" title="' + course.name + '">' +
                         (course.name ? course.name.substring(0, 20) + (course.name.length > 20 ? '...' : '') : 'Course') +
@@ -469,6 +471,16 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                     rowHtml += '<td class="px-4 py-3">';
                     rowHtml += '<div class="fw-bold text-dark">' + (student.name || 'Unknown') + '</div>';
                     rowHtml += '<div class="small text-muted">' + (student.email || '') + '</div>';
+                    rowHtml += '</td>';
+
+                    // Engagement Score Column
+                    var score = student.engagement_score !== undefined ? student.engagement_score : 0;
+                    var badgeClass = 'bg-danger';
+                    if (score >= 70) badgeClass = 'bg-success';
+                    else if (score >= 40) badgeClass = 'bg-warning text-dark';
+
+                    rowHtml += '<td class="text-center px-4 py-3">';
+                    rowHtml += '<span class="badge rounded-pill ' + badgeClass + '">' + score + '</span>';
                     rowHtml += '</td>';
 
                     visibleCourses.forEach(function (course) {
@@ -872,9 +884,17 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
         render: function (data) {
             console.log('Rendering system analytics data:', data);
+            this.lastData = data; // Store for export
+
             this.renderStats(data);
             this.renderTable(data.categories);
             this.renderCharts(data);
+
+            // Bind export button
+            var self = this;
+            $('#btn-admin-export').off('click').on('click', function () {
+                self.exportToCSV();
+            });
         },
 
         renderStats: function (data) {
@@ -981,6 +1001,36 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 html += '</tr>';
                 $tbody.append(html);
             });
+        },
+
+        exportToCSV: function () {
+            var data = this.lastData; // Need to store this
+            if (!data || !data.categories) return;
+
+            var csv = [];
+            csv.push('Category,Courses,Students,Teachers,Ratio');
+
+            data.categories.forEach(function (cat) {
+                var ratio = cat.teacher_count > 0 ? (cat.student_count / cat.teacher_count).toFixed(1) : '-';
+                var row = [
+                    '"' + cat.name.replace(/"/g, '""') + '"',
+                    cat.course_count,
+                    cat.student_count,
+                    cat.teacher_count,
+                    ratio
+                ];
+                csv.push(row.join(','));
+            });
+
+            var csvString = csv.join('\n');
+            var blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "system_analytics.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     };
 
