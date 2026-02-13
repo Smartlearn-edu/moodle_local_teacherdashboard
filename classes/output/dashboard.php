@@ -58,6 +58,9 @@ class dashboard implements renderable, templatable
     /** @var int $uniqueStudents Unique students count */
     protected $uniqueStudents;
 
+    /** @var array $subcategories List of direct subcategories with stats */
+    protected $subcategories;
+
     /**
      * Constructor.
      * 
@@ -68,8 +71,9 @@ class dashboard implements renderable, templatable
      * @param bool $showClicked Whether the show button was clicked
      * @param int $totalEnrollments
      * @param int $uniqueStudents
+     * @param array $subcategories
      */
-    public function __construct($courses, $isPrivileged = false, $categories = [], $selectedCategory = 0, $showClicked = false, $totalEnrollments = 0, $uniqueStudents = 0)
+    public function __construct($courses, $isPrivileged = false, $categories = [], $selectedCategory = 0, $showClicked = false, $totalEnrollments = 0, $uniqueStudents = 0, $subcategories = [])
     {
         $this->coursesInput = $courses;
         $this->isPrivileged = $isPrivileged;
@@ -78,6 +82,7 @@ class dashboard implements renderable, templatable
         $this->showClicked = $showClicked;
         $this->totalEnrollments = $totalEnrollments;
         $this->uniqueStudents = $uniqueStudents;
+        $this->subcategories = $subcategories;
     }
 
     /**
@@ -99,6 +104,10 @@ class dashboard implements renderable, templatable
         $data->totalenrollments = $this->totalEnrollments;
         $data->uniquestudents = $this->uniqueStudents;
         $data->hasstats = ($this->totalEnrollments > 0);
+
+        // Subcategories
+        $data->subcategories = array_values($this->subcategories);
+        $data->hassubcategories = !empty($this->subcategories);
         // dynamic title
         $data->dashboardtitle = $this->isPrivileged
             ? 'Admin / Manager Dashboard'

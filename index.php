@@ -72,13 +72,9 @@ if ($isPrivileged) {
 
     // Only fetch courses if "Show" is clicked, or if we want to show everything by default (User requested OFF by default)
     if ($show_clicked) {
-        $params = [];
-        $sql = "SELECT c.id, c.fullname, c.shortname, c.visible, c.category, c.summary, c.summaryformat
-                  FROM {course} c
-                 WHERE c.id != 1"; // Exclude site course
-
+        // 1. Calculate Stats (Recursive: All subcategories)
         if ($selected_category > 0) {
-            // Include subcategories
+            $category = null;
             if (class_exists('core_course_category')) {
                 $category = core_course_category::get($selected_category, IGNORE_MISSING);
             } else {
@@ -87,45 +83,101 @@ if ($isPrivileged) {
 
             if ($category) {
                 // Get all children IDs recursively using the path
-                // Categories have a path like /1/2/3. We want all categories that start with this path.
                 $subcatids = $DB->get_fieldset_sql("SELECT id FROM {course_categories} WHERE path LIKE ?", [$category->path . '/%']);
-
                 $allcatids = array_merge([$selected_category], $subcatids);
 
                 list($insql, $inparams) = $DB->get_in_or_equal($allcatids, SQL_PARAMS_NAMED);
-                $sql .= " AND c.category $insql";
-                $params = array_merge($params, $inparams);
+
+                // Get course IDs for these categories to calculate stats
+                $stat_course_ids = $DB->get_fieldset_sql("SELECT id FROM {course} WHERE category $insql", $inparams);
+
+                if (!empty($stat_course_ids)) {
+                    list($course_insql, $course_inparams) = $DB->get_in_or_equal($stat_course_ids, SQL_PARAMS_NAMED);
+
+                    // Unique Students (Recursive)
+                    $sql_unique = "SELECT COUNT(DISTINCT ra.userid)
+                                     FROM {role_assignments} ra
+                                     JOIN {context} ctx ON ctx.id = ra.contextid
+                                     JOIN {role} r ON r.id = ra.roleid
+                                    WHERE ctx.contextlevel = 50
+                                      AND ctx.instanceid $course_insql
+                                      AND r.shortname = 'student'";
+                    $unique_students = $DB->count_records_sql($sql_unique, $course_inparams);
+
+                    // Total Enrollments (Recursive)
+                    $sql_enrollments = "SELECT COUNT(ra.userid)
+                                          FROM {role_assignments} ra
+                                          JOIN {context} ctx ON ctx.id = ra.contextid
+                                          JOIN {role} r ON r.id = ra.roleid
+                                         WHERE ctx.contextlevel = 50
+                                           AND ctx.instanceid $course_insql
+                                           AND r.shortname = 'student'";
+                    $total_enrollments = $DB->count_records_sql($sql_enrollments, $course_inparams);
+                }
+
+                // 2. Fetch Direct Subcategories with Stats
+                $direct_children = $category->get_children(); // Direct children
+                foreach ($direct_children as $child) {
+                    // Recalculate stats for this child (Recursive)
+                    $child_subids = $DB->get_fieldset_sql("SELECT id FROM {course_categories} WHERE path LIKE ?", [$child->path . '/%']);
+                    $child_allids = array_merge([$child->id], $child_subids);
+
+                    list($c_insql, $c_inparams) = $DB->get_in_or_equal($child_allids, SQL_PARAMS_NAMED);
+
+                    // Get course IDs for child category tree
+                    $child_course_ids = $DB->get_fieldset_sql("SELECT id FROM {course} WHERE category $c_insql", $c_inparams);
+
+                    $child_total_enrollments = 0;
+                    $child_unique_students = 0;
+
+                    if (!empty($child_course_ids)) {
+                        list($courses_insql, $courses_inparams) = $DB->get_in_or_equal($child_course_ids, SQL_PARAMS_NAMED);
+
+                        // Unique Students for Child
+                        $sql_u = "SELECT COUNT(DISTINCT ra.userid)
+                                     FROM {role_assignments} ra
+                                     JOIN {context} ctx ON ctx.id = ra.contextid
+                                     JOIN {role} r ON r.id = ra.roleid
+                                    WHERE ctx.contextlevel = 50
+                                      AND ctx.instanceid $courses_insql
+                                      AND r.shortname = 'student'";
+                        $child_unique_students = $DB->count_records_sql($sql_u, $courses_inparams);
+
+                        // Total Enrollments for Child
+                        $sql_e = "SELECT COUNT(ra.userid)
+                                          FROM {role_assignments} ra
+                                          JOIN {context} ctx ON ctx.id = ra.contextid
+                                          JOIN {role} r ON r.id = ra.roleid
+                                         WHERE ctx.contextlevel = 50
+                                           AND ctx.instanceid $courses_insql
+                                           AND r.shortname = 'student'";
+                        $child_total_enrollments = $DB->count_records_sql($sql_e, $courses_inparams);
+                    }
+
+                    $subcategories[] = [
+                        'id' => $child->id,
+                        'name' => $child->get_formatted_name(),
+                        'totalenrollments' => $child_total_enrollments,
+                        'uniquestudents' => $child_unique_students,
+                        'url' => (new moodle_url('/local/teacherdashboard/index.php', ['categoryid' => $child->id, 'show' => 1]))->out(),
+                    ];
+                }
             }
         }
 
-        $sql .= " ORDER BY c.fullname ASC";
-        // Enforce a limit to avoid crashing on huge sites if "All" is selected
-        $courses = $DB->get_records_sql($sql, $params, 0, 500);
+        // 3. Fetch Display Courses (Direct children only)
+        $params = [];
+        $sql = "SELECT c.id, c.fullname, c.shortname, c.visible, c.category, c.summary, c.summaryformat
+                  FROM {course} c
+                 WHERE c.id != 1"; // Exclude site course
 
-        if (!empty($courses)) {
-            $course_ids = array_keys($courses);
-            list($insql, $inparams) = $DB->get_in_or_equal($course_ids, SQL_PARAMS_NAMED);
-
-            // Unique Students (No repeating)
-            $sql_unique = "SELECT COUNT(DISTINCT ra.userid)
-                             FROM {role_assignments} ra
-                             JOIN {context} ctx ON ctx.id = ra.contextid
-                             JOIN {role} r ON r.id = ra.roleid
-                            WHERE ctx.contextlevel = 50
-                              AND ctx.instanceid $insql
-                              AND r.shortname = 'student'";
-            $unique_students = $DB->count_records_sql($sql_unique, $inparams);
-
-            // Total Enrollments (Direct Sum)
-            $sql_enrollments = "SELECT COUNT(ra.userid)
-                                  FROM {role_assignments} ra
-                                  JOIN {context} ctx ON ctx.id = ra.contextid
-                                  JOIN {role} r ON r.id = ra.roleid
-                                 WHERE ctx.contextlevel = 50
-                                   AND ctx.instanceid $insql
-                                   AND r.shortname = 'student'";
-            $total_enrollments = $DB->count_records_sql($sql_enrollments, $inparams);
+        if ($selected_category > 0) {
+            $sql .= " AND c.category = :categoryid";
+            $params['categoryid'] = $selected_category;
         }
+
+        $sql .= " ORDER BY c.fullname ASC";
+        $courses = $DB->get_records_sql($sql, $params, 0, 500);
     }
 } else {
     // Teacher Mode: Existing behavior
@@ -145,7 +197,8 @@ $dashboard = new \local_teacherdashboard\output\dashboard(
     $selected_category,
     $show_clicked,
     $total_enrollments ?? 0,
-    $unique_students ?? 0
+    $unique_students ?? 0,
+    $subcategories ?? []
 );
 
 // Render the template.
