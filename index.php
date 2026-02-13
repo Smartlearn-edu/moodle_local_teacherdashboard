@@ -86,9 +86,12 @@ if ($isPrivileged) {
             }
 
             if ($category) {
-                // Get all children IDs efficiently
-                $allcatids = array_keys($category->get_children());
-                $allcatids[] = $selected_category;
+                // Get all children IDs recursively using the path
+                // Categories have a path like /1/2/3. We want all categories that start with this path.
+                $subcatids = $DB->get_fieldset_sql("SELECT id FROM {course_categories} WHERE path LIKE ?", [$category->path . '/%']);
+
+                $allcatids = array_merge([$selected_category], $subcatids);
+
                 list($insql, $inparams) = $DB->get_in_or_equal($allcatids, SQL_PARAMS_NAMED);
                 $sql .= " AND c.category $insql";
                 $params = array_merge($params, $inparams);
