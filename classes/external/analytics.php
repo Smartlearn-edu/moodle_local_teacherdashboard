@@ -585,7 +585,7 @@ class analytics extends external_api
         // 2. Find Courses with specific enrollment methods (paypal, fee, payment) or ANY method with cost > 0
         // We look for enrol instances in these categories
 
-        $sql = "SELECT DISTINCT e.courseid, e.id as enrolid, e.enrol, e.cost, e.currency, c.category, c.fullname
+        $sql = "SELECT e.id as enrolid, e.courseid, e.enrol, e.cost, e.currency, c.category, c.fullname
                   FROM {enrol} e
                   JOIN {course} c ON c.id = e.courseid
                  WHERE (e.cost > 0 
