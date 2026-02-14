@@ -1402,8 +1402,12 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         render: function (data) {
             this.lastData = data; // Store for export
             // Metrics
+            var hideCurrency = DashboardSettings.getHideCurrency();
             $('#payment-total-students').text(data.total_students);
-            $('#payment-total-revenue').text(data.currency + ' ' + Number(data.total_revenue).toLocaleString(undefined, { minimumFractionDigits: 2 }));
+            var revenueDisplay = hideCurrency
+                ? Number(data.total_revenue).toLocaleString(undefined, { minimumFractionDigits: 2 })
+                : data.currency + ' ' + Number(data.total_revenue).toLocaleString(undefined, { minimumFractionDigits: 2 });
+            $('#payment-total-revenue').text(revenueDisplay);
 
             // Render Charts
             this.renderCharts(data);
@@ -1530,19 +1534,35 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             var $tbody = $('#payment-table-body');
             $tbody.empty();
 
+            var hideCurrency = DashboardSettings.getHideCurrency();
+
             if (!courses || courses.length === 0) {
-                $tbody.append('<tr><td colspan="4" class="text-center text-muted">No paid enrollments found.</td></tr>');
+                $tbody.append('<tr><td colspan="5" class="text-center text-muted">No paid enrollments found.</td></tr>');
                 return;
             }
 
             courses.forEach(function (c) {
                 var html = '<tr>';
                 html += '<td>' + c.name + '</td>';
+                html += '<td>' + (c.shortname || '') + '</td>';
                 html += '<td class="text-center">' + c.student_count + '</td>';
 
                 // Payment breakdown column
                 var breakdownHtml = '';
-                if (c.payment_breakdown && c.payment_breakdown.length > 0) {
+                if (hideCurrency) {
+                    // Show the enrollment fee (cost per student), not total revenue
+                    if (c.payment_breakdown && c.payment_breakdown.length > 0) {
+                        c.payment_breakdown.forEach(function (pb) {
+                            var amt = Number(pb.amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                            breakdownHtml += '<div>' + amt + '</div>';
+                        });
+                    } else if (c.student_count > 0 && c.revenue > 0) {
+                        var fee = c.revenue / c.student_count;
+                        breakdownHtml = Number(fee).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    } else {
+                        breakdownHtml = '0.00';
+                    }
+                } else if (c.payment_breakdown && c.payment_breakdown.length > 0) {
                     c.payment_breakdown.forEach(function (pb) {
                         var amt = Number(pb.amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
                         breakdownHtml += '<div>' + pb.count + ' &times; ' + amt + ' ' + pb.currency + '</div>';
@@ -1553,12 +1573,15 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                     var amt = Number(costPerStudent).toLocaleString(undefined, { minimumFractionDigits: 2 });
                     breakdownHtml = '<div>' + c.student_count + ' &times; ' + amt + ' ' + currency + '</div>';
                 } else {
-                    breakdownHtml = currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    breakdownHtml = hideCurrency ? Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 }) : currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 });
                 }
                 html += '<td>' + breakdownHtml + '</td>';
 
                 // Total revenue column
-                html += '<td class="text-end fw-bold">' + currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</td>';
+                var revenueText = hideCurrency
+                    ? Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 })
+                    : currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                html += '<td class="text-end fw-bold">' + revenueText + '</td>';
                 html += '</tr>';
                 $tbody.append(html);
             });
@@ -1573,16 +1596,20 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
             var currency = data.currency || '';
             var csv = [];
+            var hideCurrency = DashboardSettings.getHideCurrency();
 
             // Header
-            csv.push('Course Name,Paid Enrollments,Payment Breakdown,Total Revenue,Currency');
+            csv.push('Course Name,Short Name,Paid Enrollments,Payment Breakdown,Total Revenue' + (hideCurrency ? '' : ',Currency'));
 
             data.courses.forEach(function (c) {
                 var courseName = '"' + (c.name || '').replace(/"/g, '""') + '"';
+                var shortName = '"' + (c.shortname || '').replace(/"/g, '""') + '"';
 
                 // Build breakdown text
                 var breakdownText = '';
-                if (c.payment_breakdown && c.payment_breakdown.length > 0) {
+                if (hideCurrency) {
+                    breakdownText = Number(c.revenue).toFixed(2);
+                } else if (c.payment_breakdown && c.payment_breakdown.length > 0) {
                     var parts = [];
                     c.payment_breakdown.forEach(function (pb) {
                         parts.push(pb.count + ' x ' + Number(pb.amount).toFixed(2) + ' ' + pb.currency);
@@ -1597,17 +1624,20 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
                 var row = [
                     courseName,
+                    shortName,
                     c.student_count,
                     breakdownText,
-                    Number(c.revenue).toFixed(2),
-                    currency
+                    Number(c.revenue).toFixed(2)
                 ];
+                if (!hideCurrency) {
+                    row.push(currency);
+                }
                 csv.push(row.join(','));
             });
 
             // Summary row
             csv.push('');
-            csv.push('"TOTAL",' + data.total_students + ',,' + Number(data.total_revenue).toFixed(2) + ',' + currency);
+            csv.push('"TOTAL",,' + data.total_students + ',,' + Number(data.total_revenue).toFixed(2) + (hideCurrency ? '' : ',' + currency));
 
             var csvString = csv.join('\n');
             var BOM = '\uFEFF'; // UTF-8 BOM for Arabic/special characters in Excel
@@ -1625,10 +1655,20 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
     var DashboardSettings = {
         paymentMode: 'actual', // default
+        hideCurrency: false, // default
 
         init: function () {
             var self = this;
             this.container = $('#section-settings');
+
+            // Show/hide estimated options based on radio selection
+            this.container.find('input[name="payment_mode"]').on('change', function () {
+                if ($(this).val() === 'estimated') {
+                    self.container.find('#estimated-options').show();
+                } else {
+                    self.container.find('#estimated-options').hide();
+                }
+            });
 
             // Load saved settings from server
             Ajax.call([{
@@ -1636,11 +1676,22 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 args: {}
             }])[0].done(function (response) {
                 self.paymentMode = response.payment_mode || 'actual';
+                self.hideCurrency = !!response.hide_currency;
                 // Set the radio button
                 self.container.find('input[name="payment_mode"][value="' + self.paymentMode + '"]').prop('checked', true);
+                // Set the checkbox
+                self.container.find('#setting-hide-currency').prop('checked', self.hideCurrency);
+                // Show/hide estimated options
+                if (self.paymentMode === 'estimated') {
+                    self.container.find('#estimated-options').show();
+                } else {
+                    self.container.find('#estimated-options').hide();
+                }
             }).fail(function () {
-                // Use default if loading fails
+                // Use defaults if loading fails
                 self.paymentMode = 'actual';
+                self.hideCurrency = false;
+                self.container.find('#estimated-options').hide();
             });
 
             // Save button
@@ -1652,6 +1703,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         save: function () {
             var self = this;
             var mode = this.container.find('input[name="payment_mode"]:checked').val() || 'actual';
+            var hideCurr = this.container.find('#setting-hide-currency').is(':checked');
             var $status = this.container.find('#settings-save-status');
             var $btn = this.container.find('#btn-save-settings');
 
@@ -1661,10 +1713,12 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             Ajax.call([{
                 methodname: 'local_teacherdashboard_save_dashboard_settings',
                 args: {
-                    payment_mode: mode
+                    payment_mode: mode,
+                    hide_currency: hideCurr
                 }
             }])[0].done(function (response) {
                 self.paymentMode = response.payment_mode;
+                self.hideCurrency = !!response.hide_currency;
                 $btn.prop('disabled', false).html('<i class="fa fa-save me-1"></i> Save Settings');
                 $status.html('<i class="fa fa-check text-success me-1"></i> Settings saved!').removeClass('text-danger').addClass('text-success');
 
@@ -1683,6 +1737,10 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
         getPaymentMode: function () {
             return this.paymentMode;
+        },
+
+        getHideCurrency: function () {
+            return this.paymentMode === 'estimated' && this.hideCurrency;
         }
     };
 

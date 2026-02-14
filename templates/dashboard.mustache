@@ -459,6 +459,7 @@
                                         <thead class="table-light">
                                             <tr>
                                                 <th>Course Name</th>
+                                                <th>Short Name</th>
                                                 <th class="text-center">Paid Enrollments</th>
                                                 <th>Payment Breakdown</th>
                                                 <th class="text-end">Total Revenue</th>
@@ -508,6 +509,15 @@
                                             Calculates revenue as <strong>enrolled students × course cost</strong>.
                                             Use this if payments are processed externally or the <code>{payments}</code> table is empty.
                                         </p>
+
+                                        <div class="ms-4 mt-2" id="estimated-options">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="setting-hide-currency" value="1">
+                                                <label class="form-check-label small" for="setting-hide-currency">
+                                                    Hide currency symbols and equations (show amounts only)
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

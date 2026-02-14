@@ -589,7 +589,7 @@ class analytics extends external_api
         // 2. Find Courses with specific enrollment methods (paypal, fee, payment) or ANY method with cost > 0
         // We look for enrol instances in these categories
 
-        $sql = "SELECT e.id as enrolid, e.courseid, e.enrol, e.cost, e.currency, c.category, c.fullname
+        $sql = "SELECT e.id as enrolid, e.courseid, e.enrol, e.cost, e.currency, c.category, c.fullname, c.shortname
                   FROM {enrol} e
                   JOIN {course} c ON c.id = e.courseid
                  WHERE (e.cost > 0 
@@ -754,6 +754,7 @@ class analytics extends external_api
                 $course_stats[$instance->courseid] = [
                     'id' => $instance->courseid,
                     'name' => $instance->fullname,
+                    'shortname' => $instance->shortname,
                     'category' => $instance->category,
                     'student_count' => 0,
                     'revenue' => 0,
@@ -958,6 +959,7 @@ class analytics extends external_api
                 new external_single_structure([
                     'id' => new external_value(\PARAM_INT, 'Course ID'),
                     'name' => new external_value(\PARAM_TEXT, 'Course Name'),
+                    'shortname' => new external_value(\PARAM_TEXT, 'Course Short Name'),
                     'category' => new external_value(\PARAM_INT, 'Category ID'),
                     'student_count' => new external_value(\PARAM_INT, 'Student Count'),
                     'revenue' => new external_value(\PARAM_FLOAT, 'Revenue'),
@@ -979,17 +981,19 @@ class analytics extends external_api
     public static function save_dashboard_settings_parameters()
     {
         return new external_function_parameters([
-            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode: actual or estimated', \VALUE_DEFAULT, 'actual')
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode: actual or estimated', \VALUE_DEFAULT, 'actual'),
+            'hide_currency' => new external_value(\PARAM_BOOL, 'Hide currency and equation in estimated mode', \VALUE_DEFAULT, false)
         ]);
     }
 
     /**
      * Save dashboard settings
      */
-    public static function save_dashboard_settings($payment_mode = 'actual')
+    public static function save_dashboard_settings($payment_mode = 'actual', $hide_currency = false)
     {
         $params = self::validate_parameters(self::save_dashboard_settings_parameters(), [
-            'payment_mode' => $payment_mode
+            'payment_mode' => $payment_mode,
+            'hide_currency' => $hide_currency
         ]);
 
         $context = \context_system::instance();
@@ -1001,8 +1005,9 @@ class analytics extends external_api
         $mode = in_array($params['payment_mode'], ['actual', 'estimated']) ? $params['payment_mode'] : 'actual';
 
         set_config('payment_mode', $mode, 'local_teacherdashboard');
+        set_config('hide_currency', $params['hide_currency'] ? 1 : 0, 'local_teacherdashboard');
 
-        return ['success' => true, 'payment_mode' => $mode];
+        return ['success' => true, 'payment_mode' => $mode, 'hide_currency' => (bool)$params['hide_currency']];
     }
 
     /**
@@ -1012,7 +1017,8 @@ class analytics extends external_api
     {
         return new external_single_structure([
             'success' => new external_value(\PARAM_BOOL, 'Whether save was successful'),
-            'payment_mode' => new external_value(\PARAM_ALPHA, 'The saved payment mode')
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'The saved payment mode'),
+            'hide_currency' => new external_value(\PARAM_BOOL, 'Whether currency is hidden')
         ]);
     }
 
@@ -1039,7 +1045,9 @@ class analytics extends external_api
             $payment_mode = 'actual';
         }
 
-        return ['payment_mode' => $payment_mode];
+        $hide_currency = (bool)get_config('local_teacherdashboard', 'hide_currency');
+
+        return ['payment_mode' => $payment_mode, 'hide_currency' => $hide_currency];
     }
 
     /**
@@ -1048,7 +1056,8 @@ class analytics extends external_api
     public static function get_dashboard_settings_returns()
     {
         return new external_single_structure([
-            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode')
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode'),
+            'hide_currency' => new external_value(\PARAM_BOOL, 'Whether currency is hidden')
         ]);
     }
 }
