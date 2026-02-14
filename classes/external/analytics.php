@@ -638,7 +638,7 @@ class analytics extends external_api
         $payments_table_exists = $dbman->table_exists('payments');
 
         // Data structures to hold per-instance aggregated data
-        // instance_data[enrolid] = ['revenue' => X, 'students' => Y]
+        // instance_data[enrolid] = ['revenue' => X, 'users' => [...], 'payments' => [...]]
         $instance_data = [];
 
         if ($payments_table_exists) {
@@ -671,11 +671,16 @@ class analytics extends external_api
                     }
 
                     if (!isset($instance_data[$eid])) {
-                        $instance_data[$eid] = ['revenue' => 0, 'users' => [], 'currency' => ''];
+                        $instance_data[$eid] = ['revenue' => 0, 'users' => [], 'currency' => '', 'payments' => []];
                     }
 
                     $instance_data[$eid]['revenue'] += (float)$payment->amount;
                     $instance_data[$eid]['users'][$payment->userid] = true;
+                    // Store each individual payment for breakdown
+                    $instance_data[$eid]['payments'][] = [
+                        'amount' => (float)$payment->amount,
+                        'currency' => strtoupper($payment->currency)
+                    ];
 
                     if (empty($instance_data[$eid]['currency']) && !empty($payment->currency)) {
                         $instance_data[$eid]['currency'] = $payment->currency;
@@ -710,10 +715,13 @@ class analytics extends external_api
                 $eid = $ec->enrolid;
                 if (isset($instance_map[$eid]) && $ec->cnt > 0) {
                     $inst = $instance_map[$eid];
+                    $cost = (float)$inst->cost;
+                    $cur = strtoupper($inst->currency);
                     $instance_data[$eid] = [
-                        'revenue' => $ec->cnt * (float)$inst->cost,
-                        'users' => array_fill(0, $ec->cnt, true), // Placeholder for count
-                        'currency' => $inst->currency
+                        'revenue' => $ec->cnt * $cost,
+                        'users' => array_fill(0, $ec->cnt, true),
+                        'currency' => $inst->currency,
+                        'payments' => [['amount' => $cost, 'currency' => $cur, 'count' => (int)$ec->cnt]]
                     ];
                 }
             }
@@ -744,11 +752,19 @@ class analytics extends external_api
                     'name' => $instance->fullname,
                     'category' => $instance->category,
                     'student_count' => 0,
-                    'revenue' => 0
+                    'revenue' => 0,
+                    'raw_payments' => []
                 ];
             }
             $course_stats[$instance->courseid]['student_count'] += $instance_students;
             $course_stats[$instance->courseid]['revenue'] += $instance_revenue;
+            // Collect raw payment entries for breakdown
+            if (!empty($data['payments'])) {
+                $course_stats[$instance->courseid]['raw_payments'] = array_merge(
+                    $course_stats[$instance->courseid]['raw_payments'],
+                    $data['payments']
+                );
+            }
 
             // Aggregate Category Stats
             if (!isset($category_stats[$instance->category])) {
@@ -781,6 +797,34 @@ class analytics extends external_api
                 }
             }
         }
+
+        // Build payment_breakdown for each course: group by amount+currency, count occurrences
+        foreach ($course_stats as &$cs) {
+            $breakdown = [];
+            if (!empty($cs['raw_payments'])) {
+                $groups = [];
+                foreach ($cs['raw_payments'] as $p) {
+                    if (isset($p['count'])) {
+                        // Already pre-grouped (fallback path)
+                        $key = $p['amount'] . '_' . $p['currency'];
+                        if (!isset($groups[$key])) {
+                            $groups[$key] = ['count' => 0, 'amount' => $p['amount'], 'currency' => $p['currency']];
+                        }
+                        $groups[$key]['count'] += $p['count'];
+                    } else {
+                        $key = $p['amount'] . '_' . $p['currency'];
+                        if (!isset($groups[$key])) {
+                            $groups[$key] = ['count' => 0, 'amount' => $p['amount'], 'currency' => $p['currency']];
+                        }
+                        $groups[$key]['count']++;
+                    }
+                }
+                $breakdown = array_values($groups);
+            }
+            $cs['payment_breakdown'] = $breakdown;
+            unset($cs['raw_payments']);
+        }
+        unset($cs);
 
         return [
             'total_students' => $total_students,
@@ -912,7 +956,14 @@ class analytics extends external_api
                     'name' => new external_value(\PARAM_TEXT, 'Course Name'),
                     'category' => new external_value(\PARAM_INT, 'Category ID'),
                     'student_count' => new external_value(\PARAM_INT, 'Student Count'),
-                    'revenue' => new external_value(\PARAM_FLOAT, 'Revenue')
+                    'revenue' => new external_value(\PARAM_FLOAT, 'Revenue'),
+                    'payment_breakdown' => new external_multiple_structure(
+                        new external_single_structure([
+                            'count' => new external_value(\PARAM_INT, 'Number of payments at this price'),
+                            'amount' => new external_value(\PARAM_FLOAT, 'Payment amount'),
+                            'currency' => new external_value(\PARAM_TEXT, 'Currency code')
+                        ])
+                    )
                 ])
             )
         ]);

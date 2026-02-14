@@ -1483,7 +1483,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             $tbody.empty();
 
             if (!courses || courses.length === 0) {
-                $tbody.append('<tr><td colspan="3" class="text-center text-muted">No paid enrollments found.</td></tr>');
+                $tbody.append('<tr><td colspan="4" class="text-center text-muted">No paid enrollments found.</td></tr>');
                 return;
             }
 
@@ -1491,7 +1491,21 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 var html = '<tr>';
                 html += '<td>' + c.name + '</td>';
                 html += '<td class="text-center">' + c.student_count + '</td>';
-                html += '<td class="text-end">' + currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</td>';
+
+                // Payment breakdown column
+                var breakdownHtml = '';
+                if (c.payment_breakdown && c.payment_breakdown.length > 0) {
+                    c.payment_breakdown.forEach(function (pb) {
+                        var amt = Number(pb.amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                        breakdownHtml += '<div>' + pb.count + ' &times; ' + amt + ' ' + pb.currency + '</div>';
+                    });
+                } else {
+                    breakdownHtml = currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                }
+                html += '<td>' + breakdownHtml + '</td>';
+
+                // Total revenue column
+                html += '<td class="text-end fw-bold">' + currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</td>';
                 html += '</tr>';
                 $tbody.append(html);
             });
