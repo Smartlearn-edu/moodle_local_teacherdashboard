@@ -1190,6 +1190,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
     var PaymentAnalytics = {
         init: function () {
             this.container = $('#section-payments');
+            this.allCategories = []; // Store all categories for hierarchy
             this.filters = {
                 categoryid: 0,
                 time: 'all'
@@ -1201,11 +1202,84 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
         bindEvents: function () {
             var self = this;
+
+            // Filter button
             this.container.find('#btn-refresh-payments').on('click', function () {
-                self.filters.categoryid = parseInt(self.container.find('#payment-filter-category').val());
-                self.filters.time = self.container.find('#payment-filter-time').val();
+                self.readFilters();
                 self.loadData();
             });
+
+            // Toggle custom date fields when "Custom Range" is selected
+            this.container.find('#payment-filter-time').on('change', function () {
+                var val = $(this).val();
+                if (val === 'custom') {
+                    self.container.find('#payment-custom-dates-from').removeClass('d-none');
+                    self.container.find('#payment-custom-dates-to').removeClass('d-none');
+                } else {
+                    self.container.find('#payment-custom-dates-from').addClass('d-none');
+                    self.container.find('#payment-custom-dates-to').addClass('d-none');
+                }
+            });
+
+            // Hierarchical category: Level 1 -> Level 2
+            this.container.find('#payment-filter-category').on('change', function () {
+                var parentId = parseInt($(this).val());
+                self.populateSubcategories(parentId, '#payment-filter-subcategory', '#payment-subcat-wrapper');
+                // Reset level 3
+                self.container.find('#payment-subsubcat-wrapper').addClass('d-none');
+                self.container.find('#payment-filter-subsubcategory').html('<option value="0">All</option>');
+            });
+
+            // Hierarchical category: Level 2 -> Level 3
+            this.container.find('#payment-filter-subcategory').on('change', function () {
+                var parentId = parseInt($(this).val());
+                self.populateSubcategories(parentId, '#payment-filter-subsubcategory', '#payment-subsubcat-wrapper');
+            });
+        },
+
+        populateSubcategories: function (parentId, selectSelector, wrapperSelector) {
+            var self = this;
+            var $select = this.container.find(selectSelector);
+            var $wrapper = this.container.find(wrapperSelector);
+
+            $select.html('<option value="0">All</option>');
+
+            if (!parentId || parentId === 0) {
+                $wrapper.addClass('d-none');
+                return;
+            }
+
+            // Find children of this parent
+            var children = this.allCategories.filter(function (c) {
+                return c.parent === parentId;
+            });
+
+            if (children.length > 0) {
+                children.forEach(function (c) {
+                    $select.append('<option value="' + c.id + '">' + c.name + '</option>');
+                });
+                $wrapper.removeClass('d-none');
+            } else {
+                $wrapper.addClass('d-none');
+            }
+        },
+
+        readFilters: function () {
+            // Read the deepest selected category
+            var cat3 = parseInt(this.container.find('#payment-filter-subsubcategory').val()) || 0;
+            var cat2 = parseInt(this.container.find('#payment-filter-subcategory').val()) || 0;
+            var cat1 = parseInt(this.container.find('#payment-filter-category').val()) || 0;
+
+            // Use the most specific (deepest) non-zero category
+            if (cat3 > 0) {
+                this.filters.categoryid = cat3;
+            } else if (cat2 > 0) {
+                this.filters.categoryid = cat2;
+            } else {
+                this.filters.categoryid = cat1;
+            }
+
+            this.filters.time = this.container.find('#payment-filter-time').val();
         },
 
         populateFilters: function () {
@@ -1216,10 +1290,16 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 args: { categoryid: 0 }
             }])[0].done(function (response) {
                 if (response.filter_options && response.filter_options.categories) {
+                    self.allCategories = response.filter_options.categories;
+
+                    // Only show root (parent = 0) categories in the first dropdown
                     var $select = self.container.find('#payment-filter-category');
                     $select.find('option:not([value="0"])').remove(); // Keep "All"
+
                     response.filter_options.categories.forEach(function (c) {
-                        $select.append('<option value="' + c.id + '">' + c.name + '</option>');
+                        if (c.parent === 0) {
+                            $select.append('<option value="' + c.id + '">' + c.name + '</option>');
+                        }
                     });
                 }
             });
@@ -1246,6 +1326,19 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                     break;
                 case 'year':
                     from = now - (365 * 86400);
+                    break;
+                case 'custom':
+                    var fromStr = this.container.find('#payment-date-from').val();
+                    var toStr = this.container.find('#payment-date-to').val();
+                    if (fromStr) {
+                        from = Math.floor(new Date(fromStr).getTime() / 1000);
+                    }
+                    if (toStr) {
+                        // Set to end of day
+                        var toDate = new Date(toStr);
+                        toDate.setHours(23, 59, 59, 999);
+                        to = Math.floor(toDate.getTime() / 1000);
+                    }
                     break;
                 case 'all':
                     from = 0;

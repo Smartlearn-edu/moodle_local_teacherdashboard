@@ -368,8 +368,9 @@
                             <h4 class="card-title mb-4"><i class="fa fa-money text-success me-2"></i> Payment Analytics</h4>
                             
                             <!-- Filters -->
-                             <div class="row mb-4">
-                                <div class="col-md-3">
+                             <div class="row mb-4 g-2 align-items-end">
+                                <!-- Time Range Preset -->
+                                <div class="col-md-2">
                                     <label class="form-label small text-muted">Time Range</label>
                                     <select id="payment-filter-time" class="form-select">
                                         <option value="all">All Time</option>
@@ -377,15 +378,40 @@
                                         <option value="week">Past 7 Days</option>
                                         <option value="month">Past 30 Days</option>
                                         <option value="year">Past Year</option>
+                                        <option value="custom">Custom Range</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
+                                <!-- Custom Date Range (hidden by default) -->
+                                <div class="col-md-2 d-none" id="payment-custom-dates-from">
+                                    <label class="form-label small text-muted">From</label>
+                                    <input type="date" id="payment-date-from" class="form-control">
+                                </div>
+                                <div class="col-md-2 d-none" id="payment-custom-dates-to">
+                                    <label class="form-label small text-muted">To</label>
+                                    <input type="date" id="payment-date-to" class="form-control">
+                                </div>
+                                <!-- Category Level 1 (Parent) -->
+                                <div class="col-md-2">
                                      <label class="form-label small text-muted">Category</label>
                                      <select id="payment-filter-category" class="form-select">
                                          <option value="0">All Categories</option>
-                                         <!-- Populated dynamically if possible, or we reuse store -->
                                      </select>
                                 </div>
+                                <!-- Category Level 2 (Subcategory) -->
+                                <div class="col-md-2 d-none" id="payment-subcat-wrapper">
+                                     <label class="form-label small text-muted">Subcategory</label>
+                                     <select id="payment-filter-subcategory" class="form-select">
+                                         <option value="0">All</option>
+                                     </select>
+                                </div>
+                                <!-- Category Level 3 (Sub-subcategory) -->
+                                <div class="col-md-2 d-none" id="payment-subsubcat-wrapper">
+                                     <label class="form-label small text-muted">Sub-subcategory</label>
+                                     <select id="payment-filter-subsubcategory" class="form-select">
+                                         <option value="0">All</option>
+                                     </select>
+                                </div>
+                                <!-- Filter Button -->
                                 <div class="col-md-2 d-flex align-items-end">
                                     <button id="btn-refresh-payments" class="btn btn-primary w-100">
                                         <i class="fa fa-filter"></i> Filter
