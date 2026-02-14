@@ -1499,6 +1499,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                         var amt = Number(pb.amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
                         breakdownHtml += '<div>' + pb.count + ' &times; ' + amt + ' ' + pb.currency + '</div>';
                     });
+                } else if (c.student_count > 0 && c.revenue > 0) {
+                    // Fallback: calculate cost per student from revenue / enrollments
+                    var costPerStudent = c.revenue / c.student_count;
+                    var amt = Number(costPerStudent).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    breakdownHtml = '<div>' + c.student_count + ' &times; ' + amt + ' ' + currency + '</div>';
                 } else {
                     breakdownHtml = currency + ' ' + Number(c.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 });
                 }
