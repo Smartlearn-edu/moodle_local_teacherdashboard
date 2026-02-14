@@ -1,10 +1,34 @@
 define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_factory', 'core/modal_events', 'core/templates'], function ($, Ajax, Str, Notification, ModalFactory, ModalEvents, Templates) {
 
+    // Reusable "Load Data" prompt for all sections
+    var LoadPrompt = {
+        show: function (container, sectionName, icon, callback) {
+            var html = '<div class="load-prompt text-center py-5">';
+            html += '<div class="card border-0 shadow-sm mx-auto" style="max-width: 420px;">';
+            html += '<div class="card-body py-5">';
+            html += '<i class="fa fa-' + icon + ' fa-3x mb-3 opacity-50"></i>';
+            html += '<h5 class="mb-3">' + sectionName + '</h5>';
+            html += '<p class="text-muted small mb-4">Click below to load data from the server.</p>';
+            html += '<button class="btn btn-primary btn-lg px-5 load-data-btn">';
+            html += '<i class="fa fa-download me-2"></i>Load Data</button>';
+            html += '</div></div></div>';
+            container.find('.load-prompt').remove();
+            container.prepend(html);
+            container.find('.load-data-btn').on('click', function () {
+                container.find('.load-prompt').remove();
+                callback();
+            });
+        }
+    };
+
     var ProgressTracker = {
         init: function () {
             this.container = $('#section-progress');
             this.selectedStudents = new Set();
-            this.loadData();
+            var self = this;
+            LoadPrompt.show(this.container, 'Student Progress', 'users', function () {
+                self.loadData();
+            });
         },
 
         loadData: function () {
@@ -758,7 +782,10 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         init: function () {
             this.container = $('#section-grading');
             this.content = $('#grading-content');
-            this.loadData();
+            var self = this;
+            LoadPrompt.show(this.container, 'Grading Overview', 'pencil', function () {
+                self.loadData();
+            });
         },
 
         loadData: function () {
@@ -869,10 +896,10 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 includesubcategories: true
             };
             this.filtersRendered = false;
-
-            if (this.container.find('#chart-enrollments-category').length > 0) {
-                this.loadData();
-            }
+            var self = this;
+            LoadPrompt.show(this.container, 'System Analytics', 'bar-chart', function () {
+                self.loadData();
+            });
         },
 
         loadData: function () {
@@ -1195,9 +1222,12 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 categoryid: 0,
                 time: 'all'
             };
-            this.populateFilters();
-            this.loadData();
-            this.bindEvents();
+            var self = this;
+            LoadPrompt.show(this.container, 'Payment Analytics', 'credit-card', function () {
+                self.populateFilters();
+                self.loadData();
+                self.bindEvents();
+            });
         },
 
         bindEvents: function () {
