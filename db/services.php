@@ -50,4 +50,11 @@ $functions = [
         'type'        => 'read',
         'ajax'        => true,
     ],
+    'local_teacherdashboard_get_payment_analytics' => [
+        'classname'   => 'local_teacherdashboard\external\analytics',
+        'methodname'  => 'get_payment_analytics',
+        'description' => 'Get payment analytics data including revenue and student counts',
+        'type'        => 'read',
+        'ajax'        => true,
+    ],
 ];

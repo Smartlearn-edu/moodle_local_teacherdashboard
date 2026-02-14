@@ -582,18 +582,21 @@ class analytics extends external_api
             }
         }
 
-        // 2. Find Courses with specific enrollment methods (paypal, fee, payment)
+        // 2. Find Courses with specific enrollment methods (paypal, fee, payment) or ANY method with cost > 0
         // We look for enrol instances in these categories
-        $enrol_methods = ['paypal', 'fee', 'payment', 'stripe']; // Add others if needed
-        list($emsql, $emparams) = $DB->get_in_or_equal($enrol_methods, SQL_PARAMS_NAMED, 'enrol');
 
         $sql = "SELECT DISTINCT e.courseid, e.id as enrolid, e.enrol, e.cost, e.currency, c.category, c.fullname
                   FROM {enrol} e
                   JOIN {course} c ON c.id = e.courseid
-                 WHERE e.enrol $emsql 
+                 WHERE (e.cost > 0 
+                    OR e.enrol LIKE '%pay%' 
+                    OR e.enrol LIKE '%fee%' 
+                    OR e.enrol LIKE '%stripe%'
+                    OR e.enrol LIKE '%mollie%'
+                    OR e.enrol LIKE '%razor%')
                    AND e.status = 0"; // Enabled instances only
 
-        $params = $emparams;
+        $params = [];
 
         if (!empty($catids)) {
             list($catsql, $catparams) = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'cat');
@@ -613,39 +616,61 @@ class analytics extends external_api
             ];
         }
 
-        // 3. For each instance, count valid enrollments within date range
+        // 3. For each instance, get ACTUAL payments from the mdl_payments table
         $course_stats = []; // courseid => stats
         $category_stats = []; // categoryid => stats
 
         $total_students = 0;
         $total_revenue = 0;
-        $currency = 'USD'; // Default, ideally we handle multi-currency, but let's take the first one found or default
+        $currency = ''; // Will be set from actual payment data
 
         foreach ($enrol_instances as $instance) {
-            if ($instance->currency) $currency = $instance->currency;
+            // Query the payments table for actual amounts paid for this enrol instance.
+            // mdl_payments stores: component='enrol_fee', paymentarea='fee', itemid=enrol.id
+            $psql = "SELECT p.id, p.userid, p.amount, p.currency, p.timecreated
+                       FROM {payments} p
+                      WHERE p.component = :component
+                        AND p.itemid = :itemid";
 
-            // Count students enrolled via this instance
-            // We check user_enrolments row
-            $uesql = "SELECT COUNT(ue.id) 
-                        FROM {user_enrolments} ue
-                       WHERE ue.enrolid = :enrolid
-                         AND ue.status = 0"; // Active enrollment
+            $pparams = [
+                'component' => $instance->enrol . '_' . $instance->enrol, // Try component format
+                'itemid' => $instance->enrolid
+            ];
 
-            $ueparams = ['enrolid' => $instance->enrolid];
+            // Actually, the component in mdl_payments is 'enrol_fee' (enrol_ + plugin name).
+            // The enrol field in mdl_enrol stores just 'fee', so component = 'enrol_' . enrol
+            $pparams['component'] = 'enrol_' . $instance->enrol;
 
             if ($fromdate > 0) {
-                $uesql .= " AND ue.timecreated >= :fromdate";
-                $ueparams['fromdate'] = $fromdate;
+                $psql .= " AND p.timecreated >= :fromdate";
+                $pparams['fromdate'] = $fromdate;
             }
             if ($todate > 0) {
-                $uesql .= " AND ue.timecreated <= :todate";
-                $ueparams['todate'] = $todate;
+                $psql .= " AND p.timecreated <= :todate";
+                $pparams['todate'] = $todate;
             }
 
-            $count = $DB->count_records_sql($uesql, $ueparams);
+            $payments = $DB->get_records_sql($psql, $pparams);
 
-            if ($count > 0) {
-                $revenue = $count * $instance->cost;
+            if (!empty($payments)) {
+                $instance_revenue = 0;
+                $instance_students = 0;
+                $seen_users = [];
+
+                foreach ($payments as $payment) {
+                    $instance_revenue += (float)$payment->amount;
+
+                    // Count distinct users (a user might have multiple payments)
+                    if (!isset($seen_users[$payment->userid])) {
+                        $seen_users[$payment->userid] = true;
+                        $instance_students++;
+                    }
+
+                    // Set currency from actual payment data (take the first one found)
+                    if (empty($currency) && !empty($payment->currency)) {
+                        $currency = $payment->currency;
+                    }
+                }
 
                 // Aggregate Course Stats
                 if (!isset($course_stats[$instance->courseid])) {
@@ -657,25 +682,28 @@ class analytics extends external_api
                         'revenue' => 0
                     ];
                 }
-                $course_stats[$instance->courseid]['student_count'] += $count;
-                $course_stats[$instance->courseid]['revenue'] += $revenue;
+                $course_stats[$instance->courseid]['student_count'] += $instance_students;
+                $course_stats[$instance->courseid]['revenue'] += $instance_revenue;
 
                 // Aggregate Category Stats
                 if (!isset($category_stats[$instance->category])) {
-                    // Get category name lazily or later
                     $category_stats[$instance->category] = [
                         'id' => $instance->category,
-                        'name' => 'Category ' . $instance->category, // Placeholder
+                        'name' => 'Category ' . $instance->category, // Placeholder, enriched later
                         'student_count' => 0,
                         'revenue' => 0
                     ];
                 }
-                $category_stats[$instance->category]['student_count'] += $count;
-                $category_stats[$instance->category]['revenue'] += $revenue;
+                $category_stats[$instance->category]['student_count'] += $instance_students;
+                $category_stats[$instance->category]['revenue'] += $instance_revenue;
 
-                $total_students += $count;
-                $total_revenue += $revenue;
+                $total_students += $instance_students;
+                $total_revenue += $instance_revenue;
             }
+        }
+
+        if (empty($currency)) {
+            $currency = 'USD'; // Fallback default
         }
 
         // Enrich Category Names
