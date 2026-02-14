@@ -1608,7 +1608,18 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                 // Build breakdown text
                 var breakdownText = '';
                 if (hideCurrency) {
-                    breakdownText = Number(c.revenue).toFixed(2);
+                    // Show enrollment fee, not total revenue
+                    if (c.payment_breakdown && c.payment_breakdown.length > 0) {
+                        var fees = [];
+                        c.payment_breakdown.forEach(function (pb) {
+                            fees.push(Number(pb.amount).toFixed(2));
+                        });
+                        breakdownText = fees.join(' / ');
+                    } else if (c.student_count > 0 && c.revenue > 0) {
+                        breakdownText = (c.revenue / c.student_count).toFixed(2);
+                    } else {
+                        breakdownText = '0.00';
+                    }
                 } else if (c.payment_breakdown && c.payment_breakdown.length > 0) {
                     var parts = [];
                     c.payment_breakdown.forEach(function (pb) {
