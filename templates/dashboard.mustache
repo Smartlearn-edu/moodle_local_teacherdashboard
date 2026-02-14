@@ -474,11 +474,51 @@
                     </div>
                 </div>
 
-                 <!-- Settings Section (Placeholder) -->
+                 <!-- Settings Section -->
                 <div id="section-settings" class="dashboard-section d-none">
-                     <div class="alert alert-light border">
-                        <h4><i class="fa fa-cog text-secondary"></i> {{#str}}section_settings, local_teacherdashboard{{/str}}</h4>
-                        <p>Dashboard settings will appear here.</p>
+                    <div class="card shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
+                        <div class="card-body">
+                            <h4 class="card-title mb-4"><i class="fa fa-cog text-secondary me-2"></i> {{#str}}section_settings, local_teacherdashboard{{/str}}</h4>
+
+                            <!-- Payment Calculation Mode -->
+                            <div class="mb-4">
+                                <h5 class="fw-bold mb-3"><i class="fa fa-money text-success me-2"></i> Payment Calculation Mode</h5>
+                                <p class="text-muted small mb-3">Choose how the payment analytics calculates revenue and student counts.</p>
+
+                                <div class="card border-0 bg-light p-3">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="radio" name="payment_mode" id="payment-mode-actual" value="actual" checked>
+                                        <label class="form-check-label fw-bold" for="payment-mode-actual">
+                                            Actual Payments
+                                        </label>
+                                        <p class="text-muted small mb-0 ms-4">
+                                            Uses the <code>{payments}</code> table to count individual payment transactions.
+                                            Shows exact amounts paid by each student. Best when your site uses Moodle's built-in payment gateway.
+                                        </p>
+                                    </div>
+
+                                    <hr class="my-2">
+
+                                    <div class="form-check mt-3">
+                                        <input class="form-check-input" type="radio" name="payment_mode" id="payment-mode-estimated" value="estimated">
+                                        <label class="form-check-label fw-bold" for="payment-mode-estimated">
+                                            Enrollment-Based Estimate
+                                        </label>
+                                        <p class="text-muted small mb-0 ms-4">
+                                            Calculates revenue as <strong>enrolled students × course cost</strong>.
+                                            Use this if payments are processed externally or the <code>{payments}</code> table is empty.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center">
+                                <button id="btn-save-settings" class="btn btn-primary px-4">
+                                    <i class="fa fa-save me-1"></i> Save Settings
+                                </button>
+                                <span id="settings-save-status" class="ms-3 small text-muted"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

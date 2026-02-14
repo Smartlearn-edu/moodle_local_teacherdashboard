@@ -57,4 +57,18 @@ $functions = [
         'type'        => 'read',
         'ajax'        => true,
     ],
+    'local_teacherdashboard_save_dashboard_settings' => [
+        'classname'   => 'local_teacherdashboard\external\analytics',
+        'methodname'  => 'save_dashboard_settings',
+        'description' => 'Save dashboard settings such as payment calculation mode',
+        'type'        => 'write',
+        'ajax'        => true,
+    ],
+    'local_teacherdashboard_get_dashboard_settings' => [
+        'classname'   => 'local_teacherdashboard\external\analytics',
+        'methodname'  => 'get_dashboard_settings',
+        'description' => 'Get dashboard settings',
+        'type'        => 'read',
+        'ajax'        => true,
+    ],
 ];

@@ -63,7 +63,8 @@ class analytics extends external_api
         return new external_function_parameters([
             'categoryid' => new external_value(\PARAM_INT, 'Filter by Category ID', \VALUE_DEFAULT, 0),
             'fromdate' => new external_value(\PARAM_INT, 'From Date Timestamp', \VALUE_DEFAULT, 0),
-            'todate' => new external_value(\PARAM_INT, 'To Date Timestamp', \VALUE_DEFAULT, 0)
+            'todate' => new external_value(\PARAM_INT, 'To Date Timestamp', \VALUE_DEFAULT, 0),
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode: actual or estimated', \VALUE_DEFAULT, 'actual')
         ]);
     }
 
@@ -550,15 +551,18 @@ class analytics extends external_api
     /**
      * Get payment analytics data
      */
-    public static function get_payment_analytics($categoryid = 0, $fromdate = 0, $todate = 0)
+    public static function get_payment_analytics($categoryid = 0, $fromdate = 0, $todate = 0, $payment_mode = 'actual')
     {
         global $DB, $USER;
 
         $params = self::validate_parameters(self::get_payment_analytics_parameters(), [
             'categoryid' => $categoryid,
             'fromdate' => $fromdate,
-            'todate' => $todate
+            'todate' => $todate,
+            'payment_mode' => $payment_mode
         ]);
+
+        $payment_mode = $params['payment_mode'];
 
         $context = \context_system::instance();
         if (!has_capability('moodle/site:config', $context) && !has_capability('moodle/course:create', $context) && !is_siteadmin()) {
@@ -641,7 +645,7 @@ class analytics extends external_api
         // instance_data[enrolid] = ['revenue' => X, 'users' => [...], 'payments' => [...]]
         $instance_data = [];
 
-        if ($payments_table_exists) {
+        if ($payments_table_exists && $payment_mode === 'actual') {
             // BATCH query: get ALL payments for all enrol instances in one query
             try {
                 list($itemsql, $itemparams) = $DB->get_in_or_equal($enrolids, SQL_PARAMS_NAMED, 'item');
@@ -692,7 +696,7 @@ class analytics extends external_api
             }
         }
 
-        if (!$payments_table_exists) {
+        if (!$payments_table_exists || $payment_mode === 'estimated') {
             // Fallback: batch query user_enrolments for all instances
             list($uesqlin, $ueparamsin) = $DB->get_in_or_equal($enrolids, SQL_PARAMS_NAMED, 'enrol');
             $uesql = "SELECT ue.enrolid, COUNT(ue.id) as cnt
@@ -966,6 +970,85 @@ class analytics extends external_api
                     )
                 ])
             )
+        ]);
+    }
+
+    /**
+     * Parameters for saving dashboard settings
+     */
+    public static function save_dashboard_settings_parameters()
+    {
+        return new external_function_parameters([
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode: actual or estimated', \VALUE_DEFAULT, 'actual')
+        ]);
+    }
+
+    /**
+     * Save dashboard settings
+     */
+    public static function save_dashboard_settings($payment_mode = 'actual')
+    {
+        $params = self::validate_parameters(self::save_dashboard_settings_parameters(), [
+            'payment_mode' => $payment_mode
+        ]);
+
+        $context = \context_system::instance();
+        if (!has_capability('moodle/site:config', $context) && !is_siteadmin()) {
+            throw new \moodle_exception('nopermissions', 'error', '', 'save dashboard settings');
+        }
+
+        // Validate mode value
+        $mode = in_array($params['payment_mode'], ['actual', 'estimated']) ? $params['payment_mode'] : 'actual';
+
+        set_config('payment_mode', $mode, 'local_teacherdashboard');
+
+        return ['success' => true, 'payment_mode' => $mode];
+    }
+
+    /**
+     * Returns for saving dashboard settings
+     */
+    public static function save_dashboard_settings_returns()
+    {
+        return new external_single_structure([
+            'success' => new external_value(\PARAM_BOOL, 'Whether save was successful'),
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'The saved payment mode')
+        ]);
+    }
+
+    /**
+     * Parameters for getting dashboard settings
+     */
+    public static function get_dashboard_settings_parameters()
+    {
+        return new external_function_parameters([]);
+    }
+
+    /**
+     * Get dashboard settings
+     */
+    public static function get_dashboard_settings()
+    {
+        $context = \context_system::instance();
+        if (!has_capability('moodle/site:config', $context) && !has_capability('moodle/course:create', $context) && !is_siteadmin()) {
+            throw new \moodle_exception('nopermissions', 'error', '', 'get dashboard settings');
+        }
+
+        $payment_mode = get_config('local_teacherdashboard', 'payment_mode');
+        if (empty($payment_mode) || !in_array($payment_mode, ['actual', 'estimated'])) {
+            $payment_mode = 'actual';
+        }
+
+        return ['payment_mode' => $payment_mode];
+    }
+
+    /**
+     * Returns for getting dashboard settings
+     */
+    public static function get_dashboard_settings_returns()
+    {
+        return new external_single_structure([
+            'payment_mode' => new external_value(\PARAM_ALPHA, 'Payment calculation mode')
         ]);
     }
 }

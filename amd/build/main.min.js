@@ -1380,12 +1380,16 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             // Show loading state?
             this.container.find('#payment-total-revenue').text('Loading...');
 
+            // Read payment mode from settings
+            var paymentMode = DashboardSettings.getPaymentMode();
+
             Ajax.call([{
                 methodname: 'local_teacherdashboard_get_payment_analytics',
                 args: {
                     categoryid: this.filters.categoryid,
                     fromdate: from,
-                    todate: to
+                    todate: to,
+                    payment_mode: paymentMode
                 }
             }])[0].done(function (response) {
                 self.render(response);
@@ -1619,6 +1623,69 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
         }
     };
 
+    var DashboardSettings = {
+        paymentMode: 'actual', // default
+
+        init: function () {
+            var self = this;
+            this.container = $('#section-settings');
+
+            // Load saved settings from server
+            Ajax.call([{
+                methodname: 'local_teacherdashboard_get_dashboard_settings',
+                args: {}
+            }])[0].done(function (response) {
+                self.paymentMode = response.payment_mode || 'actual';
+                // Set the radio button
+                self.container.find('input[name="payment_mode"][value="' + self.paymentMode + '"]').prop('checked', true);
+            }).fail(function () {
+                // Use default if loading fails
+                self.paymentMode = 'actual';
+            });
+
+            // Save button
+            this.container.find('#btn-save-settings').on('click', function () {
+                self.save();
+            });
+        },
+
+        save: function () {
+            var self = this;
+            var mode = this.container.find('input[name="payment_mode"]:checked').val() || 'actual';
+            var $status = this.container.find('#settings-save-status');
+            var $btn = this.container.find('#btn-save-settings');
+
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i> Saving...');
+            $status.text('');
+
+            Ajax.call([{
+                methodname: 'local_teacherdashboard_save_dashboard_settings',
+                args: {
+                    payment_mode: mode
+                }
+            }])[0].done(function (response) {
+                self.paymentMode = response.payment_mode;
+                $btn.prop('disabled', false).html('<i class="fa fa-save me-1"></i> Save Settings');
+                $status.html('<i class="fa fa-check text-success me-1"></i> Settings saved!').removeClass('text-danger').addClass('text-success');
+
+                // Reset PaymentAnalytics loaded state so it re-fetches with new mode
+                $('#section-payments').data('loaded', false);
+
+                setTimeout(function () {
+                    $status.text('');
+                }, 3000);
+            }).fail(function (ex) {
+                $btn.prop('disabled', false).html('<i class="fa fa-save me-1"></i> Save Settings');
+                $status.html('<i class="fa fa-times text-danger me-1"></i> Failed to save.').removeClass('text-success').addClass('text-danger');
+                Notification.exception(ex);
+            });
+        },
+
+        getPaymentMode: function () {
+            return this.paymentMode;
+        }
+    };
+
     return {
         init: function () {
             var navLinks = $('#dashboard-sidebar-nav .nav-link');
@@ -1660,6 +1727,11 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
                         if (!$('#section-payments').data('loaded')) {
                             PaymentAnalytics.init();
                             $('#section-payments').data('loaded', true);
+                        }
+                    } else if (targetId === 'section-settings') {
+                        if (!$('#section-settings').data('loaded')) {
+                            DashboardSettings.init();
+                            $('#section-settings').data('loaded', true);
                         }
                     }
                 }
