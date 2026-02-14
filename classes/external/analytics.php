@@ -616,94 +616,128 @@ class analytics extends external_api
             ];
         }
 
-        // 3. For each instance, get ACTUAL payments from the mdl_payments table
+        // 3. Batch-fetch payments for ALL enrol instances in ONE query (avoid N+1 problem)
         $course_stats = []; // courseid => stats
         $category_stats = []; // categoryid => stats
-
         $total_students = 0;
         $total_revenue = 0;
         $currency = ''; // Will be set from actual payment data
+
+        // Build lookup of enrol instances by id for quick access
+        $instance_map = []; // enrolid => instance
+        $component_map = []; // enrolid => component string
+        foreach ($enrol_instances as $instance) {
+            $instance_map[$instance->enrolid] = $instance;
+            $component_map[$instance->enrolid] = 'enrol_' . $instance->enrol;
+        }
+
+        $enrolids = array_keys($instance_map);
 
         // Check if payments table exists (Moodle 3.11+)
         $dbman = $DB->get_manager();
         $payments_table_exists = $dbman->table_exists('payments');
 
-        foreach ($enrol_instances as $instance) {
-            $instance_revenue = 0;
-            $instance_students = 0;
+        // Data structures to hold per-instance aggregated data
+        // instance_data[enrolid] = ['revenue' => X, 'students' => Y]
+        $instance_data = [];
 
-            if (!$payments_table_exists) {
-                // Fallback: estimate using enrollment count * cost
-                $uesql = "SELECT COUNT(ue.id) FROM {user_enrolments} ue WHERE ue.enrolid = :enrolid";
-                $ueparams = ['enrolid' => $instance->enrolid];
+        if ($payments_table_exists) {
+            // BATCH query: get ALL payments for all enrol instances in one query
+            try {
+                list($itemsql, $itemparams) = $DB->get_in_or_equal($enrolids, SQL_PARAMS_NAMED, 'item');
+
+                $psql = "SELECT p.id, p.userid, p.amount, p.currency, p.timecreated, p.itemid, p.component
+                           FROM {payments} p
+                          WHERE p.itemid $itemsql";
+
                 if ($fromdate > 0) {
-                    $uesql .= " AND ue.timecreated >= :fromdate";
-                    $ueparams['fromdate'] = $fromdate;
+                    $psql .= " AND p.timecreated >= :fromdate";
+                    $itemparams['fromdate'] = $fromdate;
                 }
                 if ($todate > 0) {
-                    $uesql .= " AND ue.timecreated <= :todate";
-                    $ueparams['todate'] = $todate;
+                    $psql .= " AND p.timecreated <= :todate";
+                    $itemparams['todate'] = $todate;
                 }
-                $count = $DB->count_records_sql($uesql, $ueparams);
-                if ($count > 0) {
-                    $instance_revenue = $count * (float)$instance->cost;
-                    $instance_students = $count;
-                    if (empty($currency) && !empty($instance->currency)) {
-                        $currency = $instance->currency;
-                    }
-                } else {
-                    continue;
-                }
-            } else {
-                // Use actual payment records from mdl_payments
-                try {
-                    $psql = "SELECT p.id, p.userid, p.amount, p.currency, p.timecreated
-                               FROM {payments} p
-                              WHERE p.component = :component
-                                AND p.itemid = :itemid";
 
-                    $pparams = [
-                        'component' => 'enrol_' . $instance->enrol,
-                        'itemid' => $instance->enrolid
-                    ];
+                $all_payments = $DB->get_records_sql($psql, $itemparams);
 
-                    if ($fromdate > 0) {
-                        $psql .= " AND p.timecreated >= :fromdate";
-                        $pparams['fromdate'] = $fromdate;
-                    }
-                    if ($todate > 0) {
-                        $psql .= " AND p.timecreated <= :todate";
-                        $pparams['todate'] = $todate;
-                    }
+                // Group payments by itemid (enrolid) and only include matching components
+                foreach ($all_payments as $payment) {
+                    $eid = $payment->itemid;
 
-                    $payments = $DB->get_records_sql($psql, $pparams);
-
-                    if (empty($payments)) {
+                    // Verify this payment belongs to the correct component
+                    if (!isset($component_map[$eid]) || $payment->component !== $component_map[$eid]) {
                         continue;
                     }
 
-                    $seen_users = [];
-                    foreach ($payments as $payment) {
-                        $instance_revenue += (float)$payment->amount;
-
-                        // Count distinct users
-                        if (!isset($seen_users[$payment->userid])) {
-                            $seen_users[$payment->userid] = true;
-                            $instance_students++;
-                        }
-
-                        // Set currency from actual payment data
-                        if (empty($currency) && !empty($payment->currency)) {
-                            $currency = $payment->currency;
-                        }
+                    if (!isset($instance_data[$eid])) {
+                        $instance_data[$eid] = ['revenue' => 0, 'users' => [], 'currency' => ''];
                     }
-                } catch (\Exception $e) {
-                    // If payments table query fails for any reason, skip this instance
-                    continue;
+
+                    $instance_data[$eid]['revenue'] += (float)$payment->amount;
+                    $instance_data[$eid]['users'][$payment->userid] = true;
+
+                    if (empty($instance_data[$eid]['currency']) && !empty($payment->currency)) {
+                        $instance_data[$eid]['currency'] = $payment->currency;
+                    }
+                }
+            } catch (\Exception $e) {
+                // If batch query fails, payments_table_exists was wrong or table is broken
+                $payments_table_exists = false;
+            }
+        }
+
+        if (!$payments_table_exists) {
+            // Fallback: batch query user_enrolments for all instances
+            list($uesqlin, $ueparamsin) = $DB->get_in_or_equal($enrolids, SQL_PARAMS_NAMED, 'enrol');
+            $uesql = "SELECT ue.enrolid, COUNT(ue.id) as cnt
+                        FROM {user_enrolments} ue
+                       WHERE ue.enrolid $uesqlin";
+
+            if ($fromdate > 0) {
+                $uesql .= " AND ue.timecreated >= :fromdate";
+                $ueparamsin['fromdate'] = $fromdate;
+            }
+            if ($todate > 0) {
+                $uesql .= " AND ue.timecreated <= :todate";
+                $ueparamsin['todate'] = $todate;
+            }
+            $uesql .= " GROUP BY ue.enrolid";
+
+            $enrol_counts = $DB->get_records_sql($uesql, $ueparamsin);
+
+            foreach ($enrol_counts as $ec) {
+                $eid = $ec->enrolid;
+                if (isset($instance_map[$eid]) && $ec->cnt > 0) {
+                    $inst = $instance_map[$eid];
+                    $instance_data[$eid] = [
+                        'revenue' => $ec->cnt * (float)$inst->cost,
+                        'users' => array_fill(0, $ec->cnt, true), // Placeholder for count
+                        'currency' => $inst->currency
+                    ];
                 }
             }
+        }
 
-            // Aggregate Course Stats (shared for both paths)
+        // Now aggregate per-course and per-category stats from instance_data
+        foreach ($instance_data as $eid => $data) {
+            if (!isset($instance_map[$eid])) {
+                continue;
+            }
+            $instance = $instance_map[$eid];
+            $instance_revenue = $data['revenue'];
+            $instance_students = count($data['users']);
+
+            if ($instance_students == 0 && $instance_revenue == 0) {
+                continue;
+            }
+
+            // Set currency from first available
+            if (empty($currency) && !empty($data['currency'])) {
+                $currency = $data['currency'];
+            }
+
+            // Aggregate Course Stats
             if (!isset($course_stats[$instance->courseid])) {
                 $course_stats[$instance->courseid] = [
                     'id' => $instance->courseid,
