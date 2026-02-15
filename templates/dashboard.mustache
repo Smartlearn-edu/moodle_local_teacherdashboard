@@ -2,19 +2,19 @@
     <div class="row g-0">
         <!-- Sidebar -->
         <div class="col-12 col-md-3 min-vh-100 p-0 transform-sidebar" style="background-color: #1a1d21;">
-            <div class="teacherdashboard-sidebar p-3 sticky-top">
+            <div class="smartdashboard-sidebar p-3 sticky-top">
                 <div class="text-center mb-4 pt-2">
                      <h4 class="text-white">Dashboard</h4>
                 </div>
                 <ul class="nav flex-column" id="dashboard-sidebar-nav">
                     <li class="nav-item">
                         <a class="nav-link active" href="#" data-target="section-overview">
-                            <i class="fa fa-th-large"></i> {{#str}}section_overview, local_teacherdashboard{{/str}}
+                            <i class="fa fa-th-large"></i> {{#str}}section_overview, local_smartdashboard{{/str}}
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#submenu-progress" aria-expanded="false" data-target="section-progress">
-                            <i class="fa fa-users"></i> {{#str}}section_progress, local_teacherdashboard{{/str}}
+                            <i class="fa fa-users"></i> {{#str}}section_progress, local_smartdashboard{{/str}}
                             <i class="fa fa-chevron-down float-end small mt-1"></i>
                         </a>
                         <div class="collapse" id="submenu-progress">
@@ -34,12 +34,12 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-target="section-grading">
-                            <i class="fa fa-check-square"></i> {{#str}}section_grading, local_teacherdashboard{{/str}}
+                            <i class="fa fa-check-square"></i> {{#str}}section_grading, local_smartdashboard{{/str}}
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-target="section-analytics">
-                            <i class="fa fa-bar-chart"></i> {{#str}}section_analytics, local_teacherdashboard{{/str}}
+                            <i class="fa fa-bar-chart"></i> {{#str}}section_analytics, local_smartdashboard{{/str}}
                         </a>
                     </li>
                     <li class="nav-item">
@@ -49,7 +49,7 @@
                     </li>
                      <li class="nav-item mt-4">
                         <a class="nav-link" href="#" data-target="section-settings">
-                            <i class="fa fa-cog"></i> {{#str}}section_settings, local_teacherdashboard{{/str}}
+                            <i class="fa fa-cog"></i> {{#str}}section_settings, local_smartdashboard{{/str}}
                         </a>
                     </li>
                 </ul>
@@ -172,10 +172,10 @@
                                     </h5>
                                     <div class="mt-auto pt-3 d-flex justify-content-between align-items-center">
                                         <span class="text-muted small">
-                                            <i class="fa fa-users me-1"></i> {{studentcount}} {{#str}}students, local_teacherdashboard{{/str}}
+                                            <i class="fa fa-users me-1"></i> {{studentcount}} {{#str}}students, local_smartdashboard{{/str}}
                                         </span>
                                         {{#hasgrading}}
-                                        <span class="badge bg-danger rounded-pill" title="{{gradingcount}} {{#str}}needsgrading, local_teacherdashboard{{/str}}" style="position: relative; z-index: 2;">
+                                        <span class="badge bg-danger rounded-pill" title="{{gradingcount}} {{#str}}needsgrading, local_smartdashboard{{/str}}" style="position: relative; z-index: 2;">
                                             <i class="fa fa-check-square-o me-1"></i> {{gradingcount}}
                                         </span>
                                         {{/hasgrading}}
@@ -203,7 +203,7 @@
                             
                             {{^isprivileged}}
                                 <div class="alert alert-info" role="alert">
-                                    {{#str}}nocourses, local_teacherdashboard{{/str}}
+                                    {{#str}}nocourses, local_smartdashboard{{/str}}
                                 </div>
                             {{/isprivileged}}
                         </div>
@@ -214,7 +214,7 @@
                 <!-- Progress Section (Placeholder) -->
                 <div id="section-progress" class="dashboard-section d-none">
                     <div class="alert alert-light border">
-                        <h4><i class="fa fa-users text-info"></i> {{#str}}section_progress, local_teacherdashboard{{/str}}</h4>
+                        <h4><i class="fa fa-users text-info"></i> {{#str}}section_progress, local_smartdashboard{{/str}}</h4>
                         <p>Student progress analytics will appear here.</p>
                         <!-- We will implement this next -->
                     </div>
@@ -355,7 +355,7 @@
                     {{/isprivileged}}
                     {{^isprivileged}}
                     <div class="alert alert-light border">
-                        <h4><i class="fa fa-bar-chart text-warning"></i> {{#str}}section_analytics, local_teacherdashboard{{/str}}</h4>
+                        <h4><i class="fa fa-bar-chart text-warning"></i> {{#str}}section_analytics, local_smartdashboard{{/str}}</h4>
                         <p>Course analytics will appear here.</p>
                     </div>
                     {{/isprivileged}}
@@ -479,7 +479,7 @@
                 <div id="section-settings" class="dashboard-section d-none">
                     <div class="card shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
                         <div class="card-body">
-                            <h4 class="card-title mb-4"><i class="fa fa-cog text-secondary me-2"></i> {{#str}}section_settings, local_teacherdashboard{{/str}}</h4>
+                            <h4 class="card-title mb-4"><i class="fa fa-cog text-secondary me-2"></i> {{#str}}section_settings, local_smartdashboard{{/str}}</h4>
 
                             <!-- Payment Calculation Mode -->
                             <div class="mb-4">
@@ -538,7 +538,7 @@
 </div>
 
 {{#js}}
-require(['local_teacherdashboard/main'], function(Main) {
+require(['local_smartdashboard/main'], function(Main) {
     Main.init();
 });
 {{/js}}

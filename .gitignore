@@ -1,0 +1,23 @@
+# Moodle Plugin .gitignore
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Node.js (if using grunt/npm for AMD builds)
+node_modules/
+package-lock.json
+
+# OS files
+.DS_Store
+*.bak
+*.tmp
+
+# Agent/tool files
+.gemini/
+.agent/

@@ -15,15 +15,17 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @package     local_teacherdashboard
+ * Plugin version and other meta-data.
+ *
+ * @package     local_smartdashboard
  * @copyright   2025 Mohammad Nabil <mohammad@smartlearn.education>
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_teacherdashboard';
-$plugin->version   = 2024020742;
+$plugin->component = 'local_smartdashboard';
+$plugin->version   = 2026021500;
 $plugin->requires  = 2022041900; // Moodle 4.0
-$plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.0.1';
+$plugin->maturity  = MATURITY_STABLE;
+$plugin->release   = '1.0.0';

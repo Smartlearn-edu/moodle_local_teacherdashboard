@@ -34,7 +34,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
             console.log('Fetching analytics data...');
             return Ajax.call([{
-                methodname: 'local_teacherdashboard_get_cross_course_progress',
+                methodname: 'local_smartdashboard_get_cross_course_progress',
                 args: {}
             }])[0].done(function (response) {
                 console.log('Analytics data received:', response);
@@ -703,7 +703,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             this.detailedContent.html('<div class="text-center p-5"><i class="fa fa-spinner fa-spin fa-3x"></i></div>');
 
             Ajax.call([{
-                methodname: 'local_teacherdashboard_get_student_detailed_progress',
+                methodname: 'local_smartdashboard_get_student_detailed_progress',
                 args: { studentid: studentId }
             }])[0].done(function (response) {
                 self.detailedData = response;
@@ -788,7 +788,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             this.content.html('<div class="text-center p-5"><i class="fa fa-spinner fa-spin fa-3x"></i></div>');
 
             Ajax.call([{
-                methodname: 'local_teacherdashboard_get_grading_overview',
+                methodname: 'local_smartdashboard_get_grading_overview',
                 args: {}
             }])[0].done(function (response) {
                 self.allData = response;
@@ -904,7 +904,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             console.log('Fetching System Analytics with filters:', this.currentFilters);
 
             Ajax.call([{
-                methodname: 'local_teacherdashboard_get_system_analytics',
+                methodname: 'local_smartdashboard_get_system_analytics',
                 args: this.currentFilters
             }])[0].done(function (response) {
                 self.render(response);
@@ -1318,7 +1318,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             var self = this;
             // Reuse system analytics to get categories structure
             Ajax.call([{
-                methodname: 'local_teacherdashboard_get_system_analytics',
+                methodname: 'local_smartdashboard_get_system_analytics',
                 args: { categoryid: 0 }
             }])[0].done(function (response) {
                 if (response.filter_options && response.filter_options.categories) {
@@ -1384,7 +1384,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             var paymentMode = DashboardSettings.getPaymentMode();
 
             Ajax.call([{
-                methodname: 'local_teacherdashboard_get_payment_analytics',
+                methodname: 'local_smartdashboard_get_payment_analytics',
                 args: {
                     categoryid: this.filters.categoryid,
                     fromdate: from,
@@ -1683,7 +1683,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
 
             // Load saved settings from server
             Ajax.call([{
-                methodname: 'local_teacherdashboard_get_dashboard_settings',
+                methodname: 'local_smartdashboard_get_dashboard_settings',
                 args: {}
             }])[0].done(function (response) {
                 self.paymentMode = response.payment_mode || 'actual';
@@ -1722,7 +1722,7 @@ define(['jquery', 'core/ajax', 'core/str', 'core/notification', 'core/modal_fact
             $status.text('');
 
             Ajax.call([{
-                methodname: 'local_teacherdashboard_save_dashboard_settings',
+                methodname: 'local_smartdashboard_save_dashboard_settings',
                 args: {
                     payment_mode: mode,
                     hide_currency: hideCurr

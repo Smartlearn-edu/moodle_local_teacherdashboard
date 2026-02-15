@@ -15,12 +15,14 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @package     local_teacherdashboard
+ * Dashboard output class.
+ *
+ * @package     local_smartdashboard
  * @copyright   2025 Mohammad Nabil <mohammad@smartlearn.education>
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace local_teacherdashboard\output;
+namespace local_smartdashboard\output;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -111,7 +113,7 @@ class dashboard implements renderable, templatable
         // dynamic title
         $data->dashboardtitle = $this->isPrivileged
             ? 'Admin / Manager Dashboard'
-            : \get_string('pluginname', 'local_teacherdashboard');
+            : \get_string('pluginname', 'local_smartdashboard');
 
         foreach ($this->coursesInput as $course) {
             $coursecontext = context_course::instance($course->id);

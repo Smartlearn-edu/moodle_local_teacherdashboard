@@ -15,7 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @package     local_teacherdashboard
+ * Main entry point for the Smart Dashboard.
+ *
+ * @package     local_smartdashboard
  * @copyright   2025 Mohammad Nabil <mohammad@smartlearn.education>
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -34,9 +36,9 @@ require_once($CFG->dirroot . '/lib/enrollib.php');
 // Define the page context and properties.
 $context = context_system::instance();
 $PAGE->set_context($context);
-$PAGE->set_url(new moodle_url('/local/teacherdashboard/index.php'));
-$PAGE->set_title(get_string('pluginname', 'local_teacherdashboard'));
-$PAGE->set_heading(get_string('pluginname', 'local_teacherdashboard'));
+$PAGE->set_url(new moodle_url('/local/smartdashboard/index.php'));
+$PAGE->set_title(get_string('pluginname', 'local_smartdashboard'));
+$PAGE->set_heading(get_string('pluginname', 'local_smartdashboard'));
 $PAGE->set_pagelayout('report');
 
 require_login();
@@ -159,7 +161,7 @@ if ($isPrivileged) {
                         'name' => $child->get_formatted_name(),
                         'totalenrollments' => $child_total_enrollments,
                         'uniquestudents' => $child_unique_students,
-                        'url' => (new moodle_url('/local/teacherdashboard/index.php', ['categoryid' => $child->id, 'show' => 1]))->out(),
+                        'url' => (new moodle_url('/local/smartdashboard/index.php', ['categoryid' => $child->id, 'show' => 1]))->out(),
                     ];
                 }
             }
@@ -190,7 +192,7 @@ if ($isPrivileged) {
 }
 
 // Create renderable
-$dashboard = new \local_teacherdashboard\output\dashboard(
+$dashboard = new \local_smartdashboard\output\dashboard(
     $courses,
     $isPrivileged,
     $categories_options,
@@ -202,6 +204,6 @@ $dashboard = new \local_teacherdashboard\output\dashboard(
 );
 
 // Render the template.
-echo $OUTPUT->render_from_template('local_teacherdashboard/dashboard', $dashboard->export_for_template($OUTPUT));
+echo $OUTPUT->render_from_template('local_smartdashboard/dashboard', $dashboard->export_for_template($OUTPUT));
 
 echo $OUTPUT->footer();

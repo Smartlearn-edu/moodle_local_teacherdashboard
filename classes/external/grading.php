@@ -15,12 +15,14 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @package     local_teacherdashboard
+ * External functions for grading data.
+ *
+ * @package     local_smartdashboard
  * @copyright   2025 Mohammad Nabil <mohammad@smartlearn.education>
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace local_teacherdashboard\external;
+namespace local_smartdashboard\external;
 
 defined('MOODLE_INTERNAL') || die;
 

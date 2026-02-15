@@ -15,13 +15,15 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @package     local_teacherdashboard
+ * Language strings for Smart Dashboard.
+ *
+ * @package     local_smartdashboard
  * @copyright   2025 Mohammad Nabil <mohammad@smartlearn.education>
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['pluginname'] = 'Teacher Dashboard';
-$string['teacherdashboard:view'] = 'View the teacher dashboard';
+$string['pluginname'] = 'Smart Dashboard';
+$string['smartdashboard:view'] = 'View the Smart Dashboard';
 $string['mycourses'] = 'My Courses';
 $string['nocourses'] = 'You are not teaching any courses yet.';
 $string['gotocourse'] = 'Go to Course';

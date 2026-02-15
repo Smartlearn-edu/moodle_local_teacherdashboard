@@ -15,12 +15,14 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @package     local_teacherdashboard
+ * External functions for analytics data.
+ *
+ * @package     local_smartdashboard
  * @copyright   2025 Mohammad Nabil <mohammad@smartlearn.education>
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace local_teacherdashboard\external;
+namespace local_smartdashboard\external;
 
 defined('MOODLE_INTERNAL') || die;
 
@@ -1004,8 +1006,8 @@ class analytics extends external_api
         // Validate mode value
         $mode = in_array($params['payment_mode'], ['actual', 'estimated']) ? $params['payment_mode'] : 'actual';
 
-        set_config('payment_mode', $mode, 'local_teacherdashboard');
-        set_config('hide_currency', $params['hide_currency'] ? 1 : 0, 'local_teacherdashboard');
+        set_config('payment_mode', $mode, 'local_smartdashboard');
+        set_config('hide_currency', $params['hide_currency'] ? 1 : 0, 'local_smartdashboard');
 
         return ['success' => true, 'payment_mode' => $mode, 'hide_currency' => (bool)$params['hide_currency']];
     }
@@ -1040,12 +1042,12 @@ class analytics extends external_api
             throw new \moodle_exception('nopermissions', 'error', '', 'get dashboard settings');
         }
 
-        $payment_mode = get_config('local_teacherdashboard', 'payment_mode');
+        $payment_mode = get_config('local_smartdashboard', 'payment_mode');
         if (empty($payment_mode) || !in_array($payment_mode, ['actual', 'estimated'])) {
             $payment_mode = 'actual';
         }
 
-        $hide_currency = (bool)get_config('local_teacherdashboard', 'hide_currency');
+        $hide_currency = (bool)get_config('local_smartdashboard', 'hide_currency');
 
         return ['payment_mode' => $payment_mode, 'hide_currency' => $hide_currency];
     }
